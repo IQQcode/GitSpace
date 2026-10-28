@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GitSpace · 多仓库 Git 客户端</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236f8dff'/%3E%3Cpath d='M9 21V11h6a3 3 0 0 1 0 6h-3v4' stroke='%23fff' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='20' r='3' fill='%23fff'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#0b0e13;
+    --panel:#10141b;
+    --panel-2:#141922;
+    --panel-3:#19202b;
+    --border:#222b37;
+    --border-soft:#1b232d;
+    --text:#e8eefa;
+    --muted:#8b97a9;
+    --faint:#5b6678;
+    --accent:#6f8dff;
+    --accent-soft:rgba(111,141,255,.14);
+    --green:#3ddc97;
+    --green-soft:rgba(61,220,151,.13);
+    --amber:#f4b25c;
+    --amber-soft:rgba(244,178,92,.13);
+    --red:#ff6b81;
+    --red-soft:rgba(255,107,129,.13);
+    --purple:#c78dff;
+    --chip:#1b2330;
+    --shadow:0 24px 70px rgba(0,0,0,.5);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  [data-theme="light"]{
+    --bg:#eef1f6;
+    --panel:#ffffff;
+    --panel-2:#f7f9fc;
+    --panel-3:#eef2f8;
+    --border:#dde4ee;
+    --border-soft:#e8edf5;
+    --text:#172033;
+    --muted:#63708a;
+    --faint:#98a3b6;
+    --accent:#3f63f0;
+    --accent-soft:rgba(63,99,240,.1);
+    --green:#0f9d6b;
+    --green-soft:rgba(15,157,107,.1);
+    --amber:#c27c17;
+    --amber-soft:rgba(194,124,23,.1);
+    --red:#d63a51;
+    --red-soft:rgba(214,58,81,.09);
+    --purple:#8b4fd8;
+    --chip:#f0f4fa;
+    --shadow:0 24px 70px rgba(28,41,66,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:13px;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button,input,select{font-family:inherit;color:inherit}
+  button{cursor:pointer}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:var(--faint);background-clip:content-box}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  .app{height:100vh;height:100dvh;display:flex;flex-direction:column}
+
+  /* ---------- top bar ---------- */
+  .titlebar{
+    height:46px;flex:0 0 46px;display:flex;align-items:center;gap:14px;
+    padding:0 14px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,var(--panel),var(--panel));
+    position:relative;z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13.5px;letter-spacing:.2px}
+  .logo{
+    width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#6f8dff,#4a63d8);
+    box-shadow:0 4px 12px rgba(79,105,220,.35);
+  }
+  .logo svg{width:15px;height:15px}
+  .brand small{font-weight:500;color:var(--faint);font-size:10.5px;letter-spacing:.4px;margin-left:2px}
+  .titlebar .divider{width:1px;height:18px;background:var(--border)}
+  .ws-pill{
+    display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;
+    background:var(--panel-2);border:1px solid var(--border-soft);font-size:12px;color:var(--muted);
+  }
+  .ws-pill b{color:var(--text);font-weight:600}
+  .ws-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+  .titlebar-spacer{flex:1}
+  .window-dots{display:flex;gap:7px;margin-left:6px}
+  .window-dots i{width:10px;height:10px;border-radius:50%;display:block;opacity:.85}
+  .window-dots i:nth-child(1){background:#ff5f57}
+  .window-dots i:nth-child(2){background:#febc2e}
+  .window-dots i:nth-child(3){background:#28c840}
+
+  .icon-btn{
+    width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;
+    display:grid;place-items:center;color:var(--muted);transition:.15s;
+  }
+  .icon-btn:hover{background:var(--panel-3);color:var(--text);border-color:var(--border-soft)}
+  .icon-btn svg{width:15px;height:15px}
+
+  /* ---------- layout ---------- */
+  .body{flex:1;display:flex;min-height:0}
+
+  .sidebar{
+    width:272px;flex:0 0 272px;border-right:1px solid var(--border);
+    background:var(--panel);display:flex;flex-direction:column;min-height:0;
+  }
+  .sidebar-head{padding:14px 14px 10px}
+  .ws-card{
+    border:1px solid var(--border);border-radius:12px;padding:11px 12px;
+    background:linear-gradient(150deg,var(--panel-3),var(--panel-2));position:relative;overflow:hidden;
+  }
+  .ws-card::after{
+    content:"";position:absolute;right:-30px;top:-34px;width:88px;height:88px;border-radius:50%;
+    background:radial-gradient(circle,rgba(111,141,255,.24),transparent 68%);
+  }
+  .ws-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .ws-name{font-weight:650;font-size:13px;display:flex;align-items:center;gap:7px}
+  .ws-name .badge-mini{font-size:9.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:2px 5px;letter-spacing:.3px}
+  .ws-meta{margin-top:7px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px}
+  .ws-meta span{display:inline-flex;align-items:center;gap:4px}
+  .ws-meta i{width:4px;height:4px;border-radius:50%;background:var(--faint);display:block}
+  .ws-progress{height:4px;border-radius:4px;background:var(--border);margin-top:10px;overflow:hidden}
+  .ws-progress span{display:block;height:100%;width:72%;background:linear-gradient(90deg,var(--accent),#8fd3ff);border-radius:4px}
+
+  .search-box{
+    margin:12px 14px 8px;display:flex;align-items:center;gap:7px;
+    padding:0 10px;height:32px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel-2);transition:.15s;
+  }
+  .search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .search-box svg{width:13px;height:13px;color:var(--faint);flex:0 0 auto}
+  .search-box input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:12px}
+  .search-box input::placeholder{color:var(--faint)}
+  .search-box kbd{font-family:var(--mono);font-size:9.5px;color:var(--faint);border:1px solid var(--border);border-radius:4px;padding:1px 4px}
+
+  .sidebar-label{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px 6px;font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);font-weight:600;
+  }
+  .sidebar-label span:last-child{letter-spacing:0;text-transform:none;font-weight:500}
+  .repo-list{flex:1;overflow:auto;padding:0 8px 8px}
+  .repo-item{
+    display:flex;align-items:flex-start;gap:9px;padding:8px 8px;border-radius:8px;
+    cursor:pointer;position:relative;border:1px solid transparent;transition:.13s;
+  }
+  .repo-item:hover{background:var(--panel-2)}
+  .repo-item.active{background:var(--accent-soft);border-color:rgba(111,141,255,.28)}
+  .repo-item.active .repo-name{color:var(--text)}
+  .repo-color{width:8px;height:8px;border-radius:3px;margin-top:5px;flex:0 0 8px}
+  .repo-content{flex:1;min-width:0}
+  .repo-line{display:flex;align-items:center;gap:6px}
+  .repo-name{font-size:12.5px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .repo-branch{font-family:var(--mono);font-size:10px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+  .repo-flags{display:flex;align-items:center;gap:6px;margin-left:auto;flex:0 0 auto}
+  .flag{font-size:9.5px;font-family:var(--mono);font-weight:600;line-height:1;padding:3px 4px;border-radius:4px;display:inline-flex;align-items:center;gap:2px}
+  .flag.up{color:var(--green);background:var(--green-soft)}
+  .flag.down{color:var(--amber);background:var(--amber-soft)}
+  .flag.dirty{color:var(--red);background:var(--red-soft)}
+  .flag.clean{color:var(--faint);background:var(--chip)}
+
+  .sidebar-foot{
+    border-top:1px solid var(--border);padding:9px;display:flex;flex-direction:column;gap:3px;background:var(--panel);
+  }
+  .side-action{
+    display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px;border:0;background:transparent;
+    color:var(--muted);font-size:11.5px;text-align:left;transition:.13s;
+  }
+  .side-action:hover{background:var(--panel-2);color:var(--text)}
+  .side-action svg{width:14px;height:14px;color:var(--faint)}
+  .side-action:hover svg{color:var(--accent)}
+  .side-action .k{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+
+  /* ---------- main ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+  .main-head{
+    height:50px;flex:0 0 50px;display:flex;align-items:center;gap:6px;padding:0 14px;
+    border-bottom:1px solid var(--border);background:var(--panel);
+  }
+  .tabs{display:flex;gap:2px;align-items:center}
+  .tab{
+    position:relative;display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:8px;
+    border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:550;transition:.14s;
+  }
+  .tab:hover{color:var(--text);background:var(--panel-2)}
+  .tab.active{color:var(--text);background:var(--panel-3)}
+  .tab .count{
+    font-size:9.5px;font-family:var(--mono);font-weight:600;background:var(--chip);color:var(--muted);
+    border-radius:5px;padding:2px 5px;line-height:1;
+  }
+  .tab.active .count{background:var(--accent-soft);color:var(--accent)}
+  .view-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:7px;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:11.5px;font-weight:550;transition:.14s;
+  }
+  .btn:hover{border-color:var(--faint);background:var(--panel-3)}
+  .btn svg{width:13px;height:13px}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{background:#5b7bf7;border-color:#5b7bf7}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn-ghost:hover{background:var(--panel-3);color:var(--text)}
+  .btn-sm{height:26px;padding:0 8px;font-size:11px;border-radius:6px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .view{flex:1;min-height:0;display:none;flex-direction:column}
+  .view.active{display:flex}
+
+  /* ---------- timeline ---------- */
+  .filterbar{
+    display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-soft);
+    background:var(--panel);flex-wrap:wrap;
+  }
+  .filterbar .fl{display:flex;align-items:center;gap:6px;color:var(--faint);font-size:11px}
+  .select{
+    height:28px;border-radius:7px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+    font-size:11.5px;padding:0 26px 0 9px;outline:0;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 4l3 3 3-3' fill='none' stroke='%238b97a9' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 8px center;
+  }
+  .select:hover{border-color:var(--faint)}
+  .select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .filter-input{
+    height:28px;border-radius:7px;border:1px solid var(--border);background:var(--panel-2);
+    padding:0 9px;outline:0;font-size:11.5px;width:170px;
+  }
+  .filter-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .filter-input::placeholder{color:var(--faint)}
+  .filter-count{margin-left:auto;color:var(--faint);font-size:11px}
+  .filter-count b{color:var(--text);font-family:var(--mono);font-weight:600}
+  .active-chip{
+    display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 7px;border-radius:6px;
+    background:var(--accent-soft);color:var(--accent);font-size:10.5px;font-weight:600;
+  }
+  .active-chip button{border:0;background:transparent;color:inherit;padding:0;display:grid;place-items:center;font-size:12px}
+
+  .timeline-wrap{flex:1;display:flex;min-height:0}
+  .timeline{flex:1;min-width:0;overflow:auto;padding-bottom:20px}
+  .tl-head{
+    display:grid;grid-template-columns:58px 1fr 205px 112px;gap:10px;align-items:center;
+    padding:8px 16px;border-bottom:1px solid var(--border-soft);color:var(--faint);
+    font-size:10px;letter-spacing:.7px;text-transform:uppercase;position:sticky;top:0;z-index:2;
+    background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);
+  }
+  .commit-row{
+    display:grid;grid-template-columns:58px 1fr 205px 112px;gap:10px;align-items:center;
+    padding:0 16px;height:54px;border-bottom:1px solid var(--border-soft);cursor:pointer;
+    position:relative;transition:.12s;
+  }
+  .commit-row:hover{background:var(--panel-2)}
+  .commit-row.selected{background:var(--accent-soft)}
+  .commit-row.selected::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
+  .graph{display:flex;align-items:center;height:54px;overflow:hidden}
+  .commit-main{min-width:0}
+  .commit-title{
+    font-size:12.5px;font-weight:520;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:7px;
+  }
+  .commit-title .muted{color:var(--faint);font-weight:400}
+  .merge-tag{font-size:9px;color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 40%,transparent);padding:1px 4px;border-radius:4px;font-weight:600}
+  .commit-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:10.5px;color:var(--faint);min-width:0}
+  .commit-meta .hash{font-family:var(--mono);font-size:10px}
+  .avatar{
+    width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+    font-size:8px;font-weight:700;color:#fff;flex:0 0 16px;
+  }
+  .commit-meta .author{color:var(--muted);white-space:nowrap}
+  .commit-repo{display:flex;align-items:center;gap:6px;min-width:0}
+  .repo-chip{
+    display:inline-flex;align-items:center;gap:5px;max-width:100%;flex:0 1 auto;min-width:0;
+    font-size:10px;font-weight:550;padding:3px 6px;border-radius:5px;
+    background:var(--chip);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    border:0;
+  }
+  .repo-chip:hover{filter:brightness(1.18)}
+  .repo-chip i{width:6px;height:6px;border-radius:2px;flex:0 0 6px}
+  .commit-side{text-align:right;font-size:10.5px;color:var(--faint);line-height:1.7}
+  .commit-side .hash{font-family:var(--mono);font-size:10px}
+  .branch-tag{
+    display:inline-block;font-family:var(--mono);font-size:9px;color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:4px;padding:1px 4px;
+    max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;
+  }
+  .load-more{display:flex;justify-content:center;padding:16px}
+
+  /* detail */
+  .detail{
+    width:392px;flex:0 0 392px;border-left:1px solid var(--border);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .detail-head{padding:16px 16px 13px;border-bottom:1px solid var(--border-soft)}
+  .detail-kicker{display:flex;align-items:center;gap:7px;margin-bottom:9px;font-size:10px;color:var(--faint)}
+  .detail-kicker .sha{font-family:var(--mono);color:var(--muted)}
+  .detail-title{font-size:14.5px;font-weight:650;line-height:1.5;letter-spacing:-.1px;margin:0 0 10px}
+  .detail-author{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+  .detail-author .avatar{width:22px;height:22px;font-size:9.5px;flex:0 0 22px}
+  .detail-author b{color:var(--text);font-weight:600}
+  .detail-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;margin-top:13px;font-size:11px}
+  .detail-meta-grid .k{color:var(--faint);font-size:10px;margin-bottom:2px}
+  .detail-meta-grid .v{color:var(--text);font-family:var(--mono);font-size:11px}
+  .detail-actions{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+  .detail-body{flex:1;overflow:auto}
+  .detail-section-title{
+    display:flex;align-items:center;justify-content:space-between;padding:12px 16px 7px;
+    font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);font-weight:600;
+  }
+  .detail-section-title .stat{letter-spacing:0;text-transform:none;font-family:var(--mono);font-size:10px}
+  .stat .add{color:var(--green)}
+  .stat .del{color:var(--red)}
+  .file-row{
+    display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:11.5px;cursor:pointer;
+    border-left:2px solid transparent;
+  }
+  .file-row:hover{background:var(--panel-2)}
+  .file-row.active{background:var(--panel-2);border-left-color:var(--accent)}
+  .file-status{width:15px;height:15px;border-radius:4px;display:grid;place-items:center;font-size:9px;font-weight:700;flex:0 0 15px}
+  .file-status.mod{color:var(--amber);background:var(--amber-soft)}
+  .file-status.add{color:var(--green);background:var(--green-soft)}
+  .file-status.del{color:var(--red);background:var(--red-soft)}
+  .file-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .file-stat{font-family:var(--mono);font-size:9.5px;white-space:nowrap}
+  .file-stat .a{color:var(--green)}
+  .file-stat .d{color:var(--red)}
+  .diff{
+    margin:4px 10px 14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel-2);
+  }
+  .diff-head{
+    display:flex;align-items:center;justify-content:space-between;padding:6px 9px;border-bottom:1px solid var(--border-soft);
+    font-family:var(--mono);font-size:9.5px;color:var(--faint);
+  }
+  .diff pre{margin:0;padding:8px 0;overflow:auto;font-family:var(--mono);font-size:10.5px;line-height:1.75}
+  .diff .ln{display:block;padding:0 10px;white-space:pre}
+  .diff .ln.add{background:rgba(61,220,151,.09);color:#8ee9bf}
+  .diff .ln.del{background:rgba(255,107,129,.09);color:#ff9fae}
+  .diff .ln.hunk{color:var(--accent);background:var(--accent-soft)}
+  .diff .ln.ctx{color:var(--muted)}
+  [data-theme="light"] .diff .ln.add{color:#0a7d54}
+  [data-theme="light"] .diff .ln.del{color:#b42338}
+  .empty{padding:40px 20px;text-align:center;color:var(--faint);font-size:12px}
+
+  /* ---------- status ---------- */
+  .status-scroll{flex:1;overflow:auto;padding:14px 16px 30px}
+  .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .stat-card{
+    border:1px solid var(--border);border-radius:10px;padding:11px 12px;background:var(--panel);
+  }
+  .stat-card .k{font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+  .stat-card .v{font-size:20px;font-weight:650;margin-top:5px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .stat-card .v small{font-size:10.5px;font-weight:500;color:var(--faint);margin-left:4px;letter-spacing:0}
+  .stat-card.warn .v{color:var(--amber)}
+  .stat-card.ok .v{color:var(--green)}
+  .stat-card.alert .v{color:var(--red)}
+
+  .panel{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--panel)}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border-soft)}
+  .panel-head h3{margin:0;font-size:12px;font-weight:600}
+  .panel-head .sub{color:var(--faint);font-size:10.5px}
+  .panel-head .right{margin-left:auto;display:flex;gap:6px;align-items:center}
+
+  table.repo-table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .repo-table th{
+    text-align:left;font-weight:550;color:var(--faint);font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+    padding:8px 12px;border-bottom:1px solid var(--border-soft);white-space:nowrap;background:var(--panel-2);
+  }
+  .repo-table td{padding:9px 12px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+  .repo-table tr:last-child td{border-bottom:0}
+  .repo-table tbody tr{transition:.12s}
+  .repo-table tbody tr:hover{background:var(--panel-2)}
+  .repo-table tbody tr.checked{background:var(--accent-soft)}
+  .repo-table .rname{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px}
+  .repo-table .rpath{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:3px;white-space:nowrap}
+  .sync{font-family:var(--mono);font-size:10.5px;white-space:nowrap}
+  .sync .up{color:var(--green)}
+  .sync .down{color:var(--amber)}
+  .sync .zero{color:var(--faint)}
+  .sync .none{color:var(--faint);font-family:inherit}
+  .muted-cell{color:var(--faint);font-family:var(--mono);font-size:10.5px}
+  #statusBody .branch-tag{max-width:180px}
+  .pill{
+    display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:550;
+  }
+  .pill.warn{color:var(--amber);background:var(--amber-soft)}
+  .pill.ok{color:var(--green);background:var(--green-soft)}
+  .pill.err{color:var(--red);background:var(--red-soft)}
+  .pill.neutral{color:var(--muted);background:var(--chip)}
+  .row-actions{display:flex;gap:2px;justify-content:flex-end}
+  .mini-btn{
+    border:1px solid transparent;background:transparent;color:var(--faint);border-radius:5px;
+    font-size:10px;padding:3px 6px;transition:.12s;
+  }
+  .mini-btn:hover{background:var(--panel-3);color:var(--text);border-color:var(--border)}
+  input[type="checkbox"]{
+    appearance:none;width:14px;height:14px;border-radius:4px;border:1px solid var(--border);
+    background:var(--panel-2);display:inline-grid;place-items:center;cursor:pointer;flex:0 0 14px;
+  }
+  input[type="checkbox"]:checked{background:var(--accent);border-color:var(--accent)}
+  input[type="checkbox"]:checked::after{content:"";width:7px;height:4px;border:1.5px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translateY(-1px)}
+  input[type="checkbox"]:indeterminate{background:var(--accent);border-color:var(--accent)}
+  input[type="checkbox"]:indeterminate::after{content:"";width:7px;height:1.5px;background:#fff;border-radius:1px}
+
+  .bulkbar{
+    position:sticky;bottom:0;margin-top:12px;display:flex;align-items:center;gap:10px;
+    padding:9px 12px;border:1px solid rgba(111,141,255,.45);border-radius:9px;
+    background:linear-gradient(180deg,var(--panel-3),var(--panel-2));box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .bulkbar .sel{font-size:11.5px;font-weight:600}
+  .bulkbar .sel b{color:var(--accent);font-family:var(--mono)}
+  .bulkbar .spacer{flex:1}
+
+  /* ---------- changeset ---------- */
+  .cs-scroll{flex:1;overflow:auto;padding:14px 16px 30px}
+  .cs-intro{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding:11px 13px;border-radius:10px;border:1px dashed var(--border);background:var(--panel)}
+  .cs-intro .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:0 0 28px}
+  .cs-intro .ic svg{width:15px;height:15px}
+  .cs-intro h3{margin:0;font-size:12px;font-weight:600}
+  .cs-intro p{margin:3px 0 0;color:var(--faint);font-size:11px;line-height:1.6}
+  .cs-list{display:flex;flex-direction:column;gap:10px}
+  .cs-card{border:1px solid var(--border);border-radius:11px;background:var(--panel);overflow:hidden;transition:.15s}
+  .cs-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .cs-card.open{border-color:rgba(111,141,255,.5);box-shadow:0 8px 30px rgba(0,0,0,.16)}
+  .cs-main{display:flex;align-items:center;gap:13px;padding:12px 14px;cursor:pointer}
+  .cs-progress{position:relative;width:40px;height:40px;flex:0 0 40px}
+  .cs-progress svg{transform:rotate(-90deg)}
+  .cs-progress span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:9.5px;font-weight:600}
+  .cs-info{flex:1;min-width:0}
+  .cs-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cs-card-id{font-family:var(--mono);font-size:10px;color:var(--accent);background:var(--accent-soft);padding:2px 6px;border-radius:4px;font-weight:600;flex:0 0 auto}
+  .cs-sub{display:flex;align-items:center;gap:10px;margin-top:5px;font-size:10.5px;color:var(--faint);flex-wrap:wrap}
+  .cs-sub .sep{width:3px;height:3px;border-radius:50%;background:var(--faint)}
+  .cs-sub .add{color:var(--green);font-family:var(--mono)}
+  .cs-sub .del{color:var(--red);font-family:var(--mono)}
+  .cs-right{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .cs-detail{display:none;border-top:1px solid var(--border-soft);padding:10px 14px 13px;background:var(--panel-2)}
+  .cs-card.open .cs-detail{display:block}
+  .cs-repo-row{display:grid;grid-template-columns:22px 150px 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:11px}
+  .cs-check{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:9px}
+  .cs-check.done{background:var(--green-soft);color:var(--green)}
+  .cs-check.miss{background:var(--red-soft);color:var(--red)}
+  .cs-repo{font-weight:600;font-size:11.5px;display:flex;align-items:center;gap:6px}
+  .cs-commit{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+  .cs-hash{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+  .cs-detail-foot{display:flex;gap:7px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}
+
+  /* ---------- search ---------- */
+  .search-scroll{flex:1;overflow:auto;padding:22px 24px 40px}
+  .search-hero{max-width:760px;margin:0 auto 20px;text-align:center}
+  .search-hero .eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:4px 9px;border-radius:20px;font-weight:600}
+  .search-hero h2{margin:12px 0 7px;font-size:21px;font-weight:650;letter-spacing:-.4px}
+  .search-hero p{margin:0 0 17px;color:var(--muted);font-size:12px}
+  .search-form{display:flex;gap:8px;max-width:560px;margin:0 auto}
+  .search-form .input-wrap{flex:1;display:flex;align-items:center;gap:9px;height:40px;padding:0 13px;border-radius:9px;border:1px solid var(--border);background:var(--panel)}
+  .search-form .input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  .search-form input{flex:1;border:0;outline:0;background:transparent;font-size:13px}
+  .search-form input::placeholder{color:var(--faint)}
+  .search-form .btn{height:40px;padding:0 16px}
+  .quick-cards{display:flex;justify-content:center;gap:7px;margin-top:12px;flex-wrap:wrap}
+  .quick-card{
+    border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:10.5px;
+    padding:4px 9px;border-radius:20px;transition:.13s;
+  }
+  .quick-card:hover{border-color:var(--accent);color:var(--accent)}
+  .result{max-width:860px;margin:0 auto}
+  .result-summary{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:13px}
+  .result-summary .big{font-size:12.5px;font-weight:600}
+  .result-summary .metric{font-size:11px;color:var(--faint)}
+  .result-summary .metric b{color:var(--text);font-family:var(--mono);font-weight:600}
+  .result-summary .add{color:var(--green);font-family:var(--mono)}
+  .result-summary .del{color:var(--red);font-family:var(--mono)}
+  .result-summary .right{margin-left:auto;display:flex;gap:7px}
+  .result-group{border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:10px;overflow:hidden}
+  .rg-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border-soft);background:var(--panel-2)}
+  .rg-head b{font-size:11.5px}
+  .rg-head .br{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+  .rg-head .pill{margin-left:auto}
+  .rg-commit{display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border-soft);font-size:11.5px}
+  .rg-commit:last-child{border-bottom:0}
+  .rg-commit .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+  .rg-commit .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rg-commit .h{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+  .rg-commit .a{font-size:10.5px;color:var(--faint);width:44px;text-align:right}
+  .empty-state{max-width:420px;margin:30px auto;text-align:center;color:var(--faint);font-size:12px;line-height:1.8}
+  .empty-state .big{font-size:28px;margin-bottom:8px;opacity:.5}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(5,8,13,.62);backdrop-filter:blur(3px);
+    display:flex;align-items:center;justify-content:center;z-index:100;
+    opacity:0;pointer-events:none;transition:.16s;
+  }
+  .overlay.show{opacity:1;pointer-events:auto}
+  .modal{
+    width:520px;max-width:calc(100vw - 40px);max-height:84vh;display:flex;flex-direction:column;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+    transform:translateY(8px) scale(.99);transition:.18s;
+  }
+  .overlay.show .modal{transform:none}
+  .modal-head{display:flex;align-items:flex-start;gap:10px;padding:15px 16px 12px;border-bottom:1px solid var(--border-soft)}
+  .modal-head h3{margin:0;font-size:13.5px;font-weight:650}
+  .modal-head p{margin:3px 0 0;font-size:11px;color:var(--faint);line-height:1.6}
+  .modal-head .x{margin-left:auto;width:26px;height:26px;border-radius:6px;border:0;background:transparent;color:var(--faint);display:grid;place-items:center}
+  .modal-head .x:hover{background:var(--panel-3);color:var(--text)}
+  .modal-body{padding:14px 16px;overflow:auto}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:11px 16px;border-top:1px solid var(--border-soft)}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:10.5px;color:var(--faint);margin-bottom:5px;font-weight:550}
+  .field .input{
+    width:100%;height:34px;border-radius:7px;border:1px solid var(--border);background:var(--panel-2);
+    padding:0 10px;outline:0;font-size:12px;
+  }
+  .field .input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .field .hint{font-size:10.5px;color:var(--faint);margin-top:5px;line-height:1.6}
+  .scan-box{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--panel-2);
+    border:1px solid var(--border-soft);font-size:11px;color:var(--muted);
+  }
+  .scan-box .pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:.3;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+  .discover-list{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+  .discover-item{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;font-size:11.5px}
+  .discover-item:hover{background:var(--panel-2)}
+  .discover-item .nm{font-weight:550}
+  .discover-item .pt{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-left:auto}
+  .batch-line{display:flex;align-items:center;gap:9px;padding:7px 4px;font-size:11.5px}
+  .batch-line .st{margin-left:auto;font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:5px}
+  .spinner{width:11px;height:11px;border:1.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .done-ic{color:var(--green)}
+  .fail-ic{color:var(--red)}
+
+  /* ---------- toast ---------- */
+  .toasts{position:fixed;right:16px;bottom:34px;display:flex;flex-direction:column;gap:7px;z-index:200;align-items:flex-end}
+  .toast{
+    display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+    background:var(--panel-3);border:1px solid var(--border);box-shadow:var(--shadow);
+    font-size:11.5px;color:var(--text);animation:toastIn .2s ease;max-width:340px;
+  }
+  .toast .ic{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:10px;background:var(--green-soft);color:var(--green);flex:0 0 16px}
+  .toast.info .ic{background:var(--accent-soft);color:var(--accent)}
+  @keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ---------- status bar ---------- */
+  .statusbar{
+    height:26px;flex:0 0 26px;border-top:1px solid var(--border);background:var(--panel);
+    display:flex;align-items:center;gap:14px;padding:0 12px;font-size:10.5px;color:var(--faint);
+  }
+  .statusbar .item{display:flex;align-items:center;gap:5px}
+  .statusbar .right{margin-left:auto;display:flex;gap:14px;align-items:center}
+  .statusbar .dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
+  .statusbar .accent{color:var(--accent);font-weight:600}
+  .statusbar .mono{font-family:var(--mono);font-size:9.5px}
+
+  @media (max-width:1240px){
+    .detail{width:340px;flex-basis:340px}
+    .commit-row,.tl-head{grid-template-columns:58px 1fr 172px 100px}
+  }
+  @media (max-width:1080px){
+    .detail{display:none}
+    .sidebar{width:240px;flex-basis:240px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="titlebar">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 18V6h6.5a3.5 3.5 0 0 1 0 7H9v5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="17.5" cy="16.5" r="2.4" stroke="#fff" stroke-width="2"/><path d="M9 13h4.5c2 0 3.5 1 4 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </span>
+      GitSpace
+      <small>PREVIEW</small>
+    </div>
+    <span class="divider"></span>
+    <div class="ws-pill">
+      <span class="dot"></span>
+      工作区 <b>抖音 iOS · 主工程</b>
+      <span style="color:var(--faint)">8 个仓库</span>
+    </div>
+    <div class="titlebar-spacer"></div>
+    <button class="icon-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    </button>
+    <button class="icon-btn" title="设置" aria-label="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.14.6.66 1 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/></svg>
+    </button>
+    <div class="window-dots"><i></i><i></i><i></i></div>
+  </header>
+
+  <div class="body">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="ws-card">
+          <div class="ws-card-top">
+            <div class="ws-name">抖音 iOS · 主工程 <span class="badge-mini">MULTI-REPO</span></div>
+          </div>
+          <div class="ws-meta">
+            <span><i></i> app + components</span>
+            <span><i></i> master</span>
+          </div>
+          <div class="ws-progress"><span></span></div>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="repoSearch" placeholder="筛选仓库或分支" />
+        <kbd>⌘K</kbd>
+      </div>
+
+      <div class="sidebar-label"><span>仓库 · <b id="repoCount">8</b></span><span>同步状态</span></div>
+      <div class="repo-list" id="repoList"></div>
+
+      <div class="sidebar-foot">
+        <button class="side-action" id="addRepoBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+          添加仓库
+          <span class="k">⌘O</span>
+        </button>
+        <button class="side-action" id="scanRepoBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke-linecap="round"/><path d="M7 12h10" stroke-linecap="round"/></svg>
+          扫描父目录
+          <span class="k">⌘⇧O</span>
+        </button>
+        <button class="side-action" id="importManifestBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4" stroke-linecap="round"/></svg>
+          导入 mgit 清单
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-head">
+        <nav class="tabs">
+          <button class="tab active" data-view="timeline">
+            统一时间线 <span class="count">16</span>
+          </button>
+          <button class="tab" data-view="status">
+            多仓状态 <span class="count" id="tabStatusCount">8</span>
+          </button>
+          <button class="tab" data-view="changeset">
+            变更集 <span class="count">4</span>
+          </button>
+          <button class="tab" data-view="search">
+            聚合检索
+          </button>
+        </nav>
+        <div class="view-actions">
+          <button class="btn btn-ghost" id="refreshBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 11a8 8 0 1 0-2.3 5.7" stroke-linecap="round"/><path d="M20 4v7h-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            刷新
+          </button>
+          <button class="btn btn-primary" id="batchFetchTop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0 4-4m-4 4-4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round"/></svg>
+            全部 Fetch
+          </button>
+        </div>
+      </div>
+
+      <!-- ============ TIMELINE ============ -->
+      <section class="view active" id="view-timeline">
+        <div class="filterbar">
+          <div class="fl">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 5h18M6 12h12M10 19h4" stroke-linecap="round"/></svg>
+          </div>
+          <select class="select" id="repoFilter">
+            <option value="all">全部仓库 (8)</option>
+          </select>
+          <select class="select" id="branchFilter">
+            <option value="all">全部分支</option>
+            <option value="master">master</option>
+            <option value="develop">develop</option>
+            <option value="feature">feature/*</option>
+          </select>
+          <select class="select" id="authorFilter">
+            <option value="all">全部作者</option>
+          </select>
+          <select class="select" id="dateFilter">
+            <option value="all">全部时间</option>
+            <option value="today">今天</option>
+            <option value="week">近 7 天</option>
+            <option value="month">近 30 天</option>
+          </select>
+          <input class="filter-input" id="commitSearch" placeholder="搜索提交信息 / hash / 卡片号" />
+          <button class="btn btn-ghost btn-sm" id="resetFilters">清除</button>
+          <div class="filter-count"><b id="commitCount">16</b> 条提交 · 8 个仓库</div>
+        </div>
+        <div class="timeline-wrap">
+          <div class="timeline" id="timeline">
+            <div class="tl-head">
+              <span>图</span><span>提交</span><span>仓库 / 分支</span><span style="text-align:right">时间 / hash</span>
+            </div>
+            <div id="commitList"></div>
+            <div class="load-more"><button class="btn" id="loadMore">加载更早的提交</button></div>
+          </div>
+          <aside class="detail" id="detail"></aside>
+        </div>
+      </section>
+
+      <!-- ============ STATUS ============ -->
+      <section class="view" id="view-status">
+        <div class="status-scroll">
+          <div class="stat-strip">
+            <div class="stat-card">
+              <div class="k">纳管仓库</div>
+              <div class="v" id="statRepos">8<small>个</small></div>
+            </div>
+            <div class="stat-card ok">
+              <div class="k">工作区干净</div>
+              <div class="v" id="statClean">4<small>个</small></div>
+            </div>
+            <div class="stat-card warn">
+              <div class="k">待同步 / 未推送</div>
+              <div class="v" id="statSync">5<small>个</small></div>
+            </div>
+            <div class="stat-card alert">
+              <div class="k">需要处理</div>
+              <div class="v" id="statConflict">1<small>个</small></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>仓库状态总览</h3>
+              <span class="sub">一屏看清每个仓库的分支、同步与未提交改动</span>
+              <div class="right">
+                <button class="btn btn-sm" id="selectDirty">选中待同步</button>
+                <button class="btn btn-sm" id="clearSelect">取消选择</button>
+              </div>
+            </div>
+            <div style="overflow:auto">
+              <table class="repo-table">
+                <thead>
+                  <tr>
+                    <th style="width:34px"><input type="checkbox" id="selectAll" aria-label="全选" /></th>
+                    <th>仓库</th>
+                    <th>当前分支</th>
+                    <th>同步</th>
+                    <th>工作区</th>
+                    <th>未推送</th>
+                    <th>最近 Fetch</th>
+                    <th style="text-align:right">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="statusBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bulkbar" id="bulkbar" style="display:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h10" stroke-linecap="round"/></svg>
+            <div class="sel">已选择 <b id="bulkCount">0</b> 个仓库</div>
+            <div class="spacer"></div>
+            <button class="btn btn-sm" data-batch="fetch">批量 Fetch</button>
+            <button class="btn btn-sm" data-batch="pull">批量 Pull</button>
+            <button class="btn btn-sm btn-primary" data-batch="push">批量 Push</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CHANGESET ============ -->
+      <section class="view" id="view-changeset">
+        <div class="cs-scroll">
+          <div class="cs-intro">
+            <div class="ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h7" stroke-linecap="round"/><circle cx="18" cy="17" r="3"/><path d="m16.5 17 1 1 2-2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>同一逻辑改动，跨多个仓库自动聚合成一个变更集</h3>
+              <p>按卡片号 / 分支名 / 时间窗口关联跨仓提交，确认“这次改动涉及的仓库是否都齐了”。这是 IDEA 统一 Log 尚未直接提供、却最贴合多仓协作的视图。</p>
+            </div>
+          </div>
+          <div class="cs-list" id="changesetList"></div>
+        </div>
+      </section>
+
+      <!-- ============ SEARCH ============ -->
+      <section class="view" id="view-search">
+        <div class="search-scroll">
+          <div class="search-hero">
+            <div class="eyebrow">CROSS-REPO SEARCH</div>
+            <h2>按卡片号聚合跨仓交付</h2>
+            <p>输入迭代卡片号，一次列出本次改动涉及的所有仓库、提交与代码量，直接作为 CR 清单。</p>
+            <div class="search-form">
+              <div class="input-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input id="cardInput" value="tieba02-88421" placeholder="例如 tieba02-88421" />
+              </div>
+              <button class="btn btn-primary" id="cardSearchBtn">聚合检索</button>
+            </div>
+            <div class="quick-cards">
+              <button class="quick-card" data-card="tieba02-88421">tieba02-88421</button>
+              <button class="quick-card" data-card="tieba02-88377">tieba02-88377</button>
+              <button class="quick-card" data-card="tieba02-88340">tieba02-88340</button>
+              <button class="quick-card" data-card="tieba02-88312">tieba02-88312</button>
+            </div>
+          </div>
+          <div class="result" id="searchResult"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="statusbar">
+    <div class="item"><span class="dot"></span> 8 个仓库已纳管</div>
+    <div class="item">12 个未推送提交</div>
+    <div class="item" id="lastRefresh">上次刷新 13:42</div>
+    <div class="right">
+      <div class="item"><span class="accent">●</span> 本地模式 · 数据不上传</div>
+      <div class="item mono">Git 2.43.0</div>
+      <div class="item">v0.1.0-preview</div>
+    </div>
+  </footer>
+</div>
+
+<!-- modals -->
+<div class="overlay" id="addRepoOverlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h3>添加仓库</h3>
+        <p>把任意本地 Git 仓库加入当前工作区，支持私有仓库与自建 Gerrit / icode。</p>
+      </div>
+      <button class="x" data-close="addRepoOverlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>本地路径</label>
+        <input class="input" id="repoPathInput" placeholder="~/dev/tieba-ios/components/GdComment" />
+        <div class="hint">支持拖拽文件夹到窗口，或使用 ⌘O 快速添加。</div>
+      </div>
+      <div class="field">
+        <label>显示名称（可选）</label>
+        <input class="input" id="repoNameInput" placeholder="默认取目录名" />
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="addRepoOverlay">取消</button>
+      <button class="btn btn-primary" id="confirmAddRepo">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="scanOverlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h3>扫描父目录</h3>
+        <p>自动发现目录下所有 Git 仓库，对应抖音 Components/ 一键纳管 50+ 仓。</p>
+      </div>
+      <button class="x" data-close="scanOverlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>父目录</label>
+        <input class="input" id="scanPathInput" value="~/dev/tieba-ios/components" />
+      </div>
+      <button class="btn" id="doScan" style="margin-bottom:10px">开始扫描</button>
+      <div id="scanArea"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="scanOverlay">取消</button>
+      <button class="btn btn-primary" id="confirmScan" disabled>导入选中</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="batchOverlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h3 id="batchTitle">批量 Fetch</h3>
+        <p id="batchSub">正在与远程仓库同步，请稍候…</p>
+      </div>
+      <button class="x" data-close="batchOverlay">✕</button>
+    </div>
+    <div class="modal-body" id="batchBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" data-close="batchOverlay">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------ data ------------------------------ */
+  const REPOS = [
+    { id: "app",      name: "app",            path: "~/dev/tieba-ios/app",                 branch: "master",                     ahead: 2, behind: 0, dirty: 3, unpushed: 2, fetched: "3 分钟前", color: "#6f8dff" },
+    { id: "thread",   name: "GdThread",       path: "~/dev/tieba-ios/components/GdThread", branch: "feature/tieba-1.2-thread",    ahead: 1, behind: 2, dirty: 0, unpushed: 1, fetched: "8 分钟前", color: "#3ddc97" },
+    { id: "feed",     name: "GdFeedSupports", path: "~/dev/tieba-ios/components/GdFeed",   branch: "feature/tieba-1.2-feed",      ahead: 1, behind: 0, dirty: 2, unpushed: 1, fetched: "12 分钟前", color: "#f4b25c" },
+    { id: "home",     name: "GdHome",         path: "~/dev/tieba-ios/components/GdHome",   branch: "develop",                     ahead: 0, behind: 1, dirty: 0, unpushed: 0, fetched: "15 分钟前", color: "#c78dff" },
+    { id: "im",       name: "GdIM",           path: "~/dev/tieba-ios/components/GdIM",     branch: "feature/im-diff",             ahead: 0, behind: 0, dirty: 0, unpushed: 0, fetched: "20 分钟前", color: "#5cc9e8" },
+    { id: "personal", name: "GdPersonal",     path: "~/dev/tieba-ios/components/GdPersonal", branch: "master",                    ahead: 0, behind: 0, dirty: 1, unpushed: 0, fetched: "24 分钟前", color: "#ff8fa3" },
+    { id: "video",    name: "GdVideo",        path: "~/dev/tieba-ios/components/GdVideo",  branch: "feature/half-screen",          ahead: 3, behind: 0, dirty: 0, unpushed: 3, fetched: "31 分钟前", color: "#e8c46a" },
+    { id: "live",     name: "GdLive",         path: "~/dev/tieba-ios/components/GdLive",   branch: "develop",                     ahead: 0, behind: 0, dirty: 1, unpushed: 0, fetched: "42 分钟前", color: "#8fd3a8" }
+  ];
+
+  const AUTHORS = ["陈默", "林子涵", "周野", "苏晚", "何嘉", "唐宁"];
+  const AUTHOR_COLORS = ["#6f8dff", "#3ddc97", "#f4b25c", "#c78dff", "#5cc9e8", "#ff8fa3"];
+
+  const COMMITS = [
+    {
+      id: "c1", repo: "app", lane: 0, merge: true,
+      title: "合并 feature/tieba-1.2-thread 到 master",
+      author: "陈默", minutes: 3, time: "3 分钟前", hash: "a91f3c2",
+      branch: "master", card: "tieba02-88421", branches: ["master", "origin/master"],
+      files: [
+        { name: "app/Classes/Thread/ThreadRouter.m", st: "M", add: 24, del: 6 },
+        { name: "Podfile.lock", st: "M", add: 12, del: 12 },
+        { name: "app/Config/FeatureFlags.h", st: "M", add: 3, del: 1 }
+      ],
+      diff: "@@ -18,9 +18,14 @@\n #import \"ThreadRouter.h\"\n+#import <GdCommentKit/GDCommentPanel.h>\n \n @implementation ThreadRouter\n-\n-+ (void)openFloor:(NSInteger)floor {\n-    [self push:@\"thread/floor\" params:@{@\"floor\": @(floor)}];\n+\n++ (void)openFloor:(NSInteger)floor {\n+    GDCommentPanel *panel = [GDCommentPanel new];\n+    panel.floor = floor;\n+    panel.enableSecondLevel = [FeatureFlags threadSecondLevelComment];\n+    [self pushViewController:panel];\n }"
+    },
+    {
+      id: "c2", repo: "thread", lane: 1,
+      title: "feat(thread): 楼层卡片支持二级评论展开",
+      author: "林子涵", minutes: 26, time: "26 分钟前", hash: "7d2b8e1",
+      branch: "feature/tieba-1.2-thread", card: "tieba02-88421", branches: ["feature/tieba-1.2-thread"],
+      files: [
+        { name: "GdThread/Classes/Floor/ThreadFloorCell.swift", st: "M", add: 86, del: 21 },
+        { name: "GdThread/Classes/Floor/CommentStackView.swift", st: "A", add: 64, del: 0 },
+        { name: "GdThread/Tests/ThreadFloorCellTests.swift", st: "M", add: 18, del: 4 }
+      ],
+      diff: "@@ -12,10 +12,19 @@ final class ThreadFloorCell: UITableViewCell {\n     static let reuseID = \"ThreadFloorCell\"\n \n-    private let contentLabel = UILabel()\n+    private let contentLabel = UILabel()\n+    private let commentStack = UIStackView()\n+    private let expandButton = UIButton(type: .system)\n \n     func bind(_ model: ThreadFloorModel) {\n         contentLabel.text = model.content\n+        commentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }\n+        model.previewComments.forEach { comment in\n+            commentStack.addArrangedSubview(CommentRow(comment))\n+        }\n+        expandButton.isHidden = model.commentCount <= 2\n     }"
+    },
+    {
+      id: "c3", repo: "app", lane: 0,
+      title: "chore: 升级 easybox 至 3.4.2，修复增量编译缓存失效",
+      author: "周野", minutes: 74, time: "1 小时前", hash: "3c9a0df",
+      branch: "master", card: "tieba02-88390", branches: ["master"],
+      files: [
+        { name: "easybox.yml", st: "M", add: 4, del: 4 },
+        { name: "scripts/bootstrap.sh", st: "M", add: 8, del: 2 }
+      ],
+      diff: "@@ -3,7 +3,7 @@\n repos:\n   - app\n   - components/*\n-toolchain: 3.3.9\n+toolchain: 3.4.2\n cache:\n-  dir: .build-cache\n+  dir: .easybox/cache\n   invalidateOnScriptChange: true"
+    },
+    {
+      id: "c4", repo: "feed", lane: 2,
+      title: "fix(feed): 修复瀑布流快速滑动时占位图闪烁",
+      author: "苏晚", minutes: 130, time: "2 小时前", hash: "b4e17aa",
+      branch: "feature/tieba-1.2-feed", card: "tieba02-88421", branches: ["feature/tieba-1.2-feed"],
+      files: [
+        { name: "GdFeedSupports/Classes/Waterfall/FeedWaterfallCell.m", st: "M", add: 31, del: 12 },
+        { name: "GdFeedSupports/Classes/Image/FeedImageLoader.m", st: "M", add: 9, del: 3 }
+      ],
+      diff: "@@ -44,8 +44,12 @@ - (void)prepareForReuse {\n     [super prepareForReuse];\n     self.coverView.image = nil;\n-    [self.imageLoader cancel];\n+    // 保留上一次的占位图，避免快速滑动时白屏闪烁\n+    if (!self.coverView.image) {\n+        self.coverView.image = [UIImage imageNamed:@\"feed_placeholder\"];\n+    }\n+    [self.imageLoader cancel];\n }\n \n - (void)bindModel:(FeedModel *)model {"
+    },
+    {
+      id: "c5", repo: "home", lane: 3,
+      title: "feat(home): 首页顶部导航接入沉浸式样式",
+      author: "何嘉", minutes: 190, time: "3 小时前", hash: "e81c5b7",
+      branch: "develop", card: "tieba02-88415", branches: ["develop"],
+      files: [
+        { name: "GdHome/Classes/Nav/HomeNavBar.m", st: "M", add: 42, del: 17 },
+        { name: "GdHome/Classes/Nav/HomeNavConfig.h", st: "A", add: 21, del: 0 }
+      ],
+      diff: "@@ -9,6 +9,14 @@ @implementation HomeNavBar\n - (void)layoutSubviews {\n     [super layoutSubviews];\n+    if (self.immersiveEnabled) {\n+        self.backgroundColor = [UIColor clearColor];\n+        self.titleLabel.alpha = self.scrollProgress;\n+        self.blurView.hidden = self.scrollProgress > 0.6;\n+    }\n }\n \n - (void)updateWithScrollOffset:(CGFloat)offset {"
+    },
+    {
+      id: "c6", repo: "thread", lane: 1,
+      title: "fix(thread): 修复长按菜单在 iOS 16 的错位",
+      author: "林子涵", minutes: 240, time: "4 小时前", hash: "f0a7d19",
+      branch: "feature/tieba-1.2-thread", card: "tieba02-88377", branches: ["feature/tieba-1.2-thread"],
+      files: [
+        { name: "GdThread/Classes/Menu/ThreadContextMenu.m", st: "M", add: 14, del: 9 }
+      ],
+      diff: "@@ -27,7 +27,9 @@ - (void)showInView:(UIView *)view atPoint:(CGPoint)point {\n-    CGRect rect = CGRectMake(point.x, point.y, 0, 0);\n+    CGFloat safeTop = view.safeAreaInsets.top;\n+    CGPoint adjusted = CGPointMake(point.x, MAX(point.y, safeTop + 8));\n+    CGRect rect = CGRectMake(adjusted.x, adjusted.y, 0, 0);\n     [self presentAtRect:rect inView:view animated:YES];\n }"
+    },
+    {
+      id: "c7", repo: "app", lane: 0,
+      title: "feat: 新增实验开关 tieba_feed_preload",
+      author: "陈默", minutes: 300, time: "5 小时前", hash: "2b6c8d4",
+      branch: "master", card: "tieba02-88377", branches: ["master"],
+      files: [
+        { name: "app/Config/FeatureFlags.h", st: "M", add: 3, del: 0 },
+        { name: "app/Classes/Feed/FeedPreloadManager.m", st: "A", add: 58, del: 0 }
+      ],
+      diff: "@@ -31,5 +31,8 @@\n + (BOOL)threadSecondLevelComment;\n + (BOOL)feedWaterfallV2;\n++ (BOOL)feedPreload {\n+    return [[self remoteValue:@\"tieba_feed_preload\"] boolValue];\n+}\n @end"
+    },
+    {
+      id: "c8", repo: "im", lane: 2,
+      title: "refactor(im): 消息列表 diff 更新逻辑，降低主线程耗时",
+      author: "周野", minutes: 420, time: "7 小时前", hash: "9d5e2f0",
+      branch: "feature/im-diff", card: "tieba02-88350", branches: ["feature/im-diff"],
+      files: [
+        { name: "GdIM/Classes/List/IMMessageListController.m", st: "M", add: 67, del: 44 },
+        { name: "GdIM/Classes/Diff/IMMessageDiff.h", st: "A", add: 26, del: 0 }
+      ],
+      diff: "@@ -88,12 +88,18 @@ - (void)reloadWithMessages:(NSArray *)messages {\n-    [self.tableView reloadData];\n+    IMMessageDiff *diff = [IMMessageDiff diffFrom:self.messages to:messages];\n+    [self.tableView beginUpdates];\n+    [self.tableView deleteRowsAtIndexPaths:diff.deleted withRowAnimation:UITableViewRowAnimationNone];\n+    [self.tableView insertRowsAtIndexPaths:diff.inserted withRowAnimation:UITableViewRowAnimationNone];\n+    [self.tableView endUpdates];\n+    self.messages = messages;\n }"
+    },
+    {
+      id: "c9", repo: "home", lane: 3,
+      title: "chore: 移除废弃的 GDHoverCard 组件",
+      author: "何嘉", minutes: 520, time: "9 小时前", hash: "1f4ab6c",
+      branch: "develop", card: "tieba02-88340", branches: ["develop"],
+      files: [
+        { name: "GdHome/Classes/Card/GDHoverCard.h", st: "D", add: 0, del: 38 },
+        { name: "GdHome/Classes/Card/GDHoverCard.m", st: "D", add: 0, del: 142 },
+        { name: "GdHome.podspec", st: "M", add: 1, del: 1 }
+      ],
+      diff: "@@ -1,38 +0,0 @@\n-#import <UIKit/UIKit.h>\n-\n-@interface GDHoverCard : UIView\n-\n-@property (nonatomic, copy) NSString *title;\n-@property (nonatomic, copy) void (^onTap)(void);\n-\n-- (void)showInView:(UIView *)view;\n-- (void)dismiss;\n-\n-@end\n+// GDHoverCard 已于 1.2 移除，统一使用 GDHomeCard"
+    },
+    {
+      id: "c10", repo: "feed", lane: 2,
+      title: "feat(feed): 支持卡片曝光埋点 v2",
+      author: "苏晚", minutes: 610, time: "10 小时前", hash: "c7d0e81",
+      branch: "feature/tieba-1.2-feed", card: "tieba02-88340", branches: ["feature/tieba-1.2-feed"],
+      files: [
+        { name: "GdFeedSupports/Classes/Track/FeedExposureTracker.m", st: "M", add: 45, del: 18 },
+        { name: "GdFeedSupports/Classes/Track/FeedExposureModel.h", st: "A", add: 20, del: 0 }
+      ],
+      diff: "@@ -15,9 +15,15 @@ - (void)trackCell:(FeedWaterfallCell *)cell atIndex:(NSInteger)index {\n-    NSDictionary *params = @{@\"card_id\": model.cardId ?: @\"\"};\n+    NSDictionary *params = @{\n+        @\"card_id\": model.cardId ?: @\"\",\n+        @\"exposure_ratio\": @(visibleRatio),\n+        @\"stay_ms\": @(stayDuration * 1000),\n+        @\"is_auto\": @(isAutoPlay)\n+    };\n     [GDTracker event:@\"feed_card_exposure\" params:params];"
+    },
+    {
+      id: "c11", repo: "personal", lane: 1,
+      title: "fix(personal): 修复个人页关注数不刷新",
+      author: "唐宁", minutes: 800, time: "13 小时前", hash: "5a3b0c9",
+      branch: "master", card: "tieba02-88312", branches: ["master"],
+      files: [
+        { name: "GdPersonal/Classes/Profile/PersonalHeaderView.m", st: "M", add: 12, del: 7 }
+      ],
+      diff: "@@ -52,7 +52,9 @@ - (void)updateWithUser:(GDUser *)user {\n     self.followCountLabel.text = [NSString stringWithFormat:@\"%ld\", (long)user.followCount];\n+    [self.followCountLabel setNeedsLayout];\n+    [self setNeedsLayout];\n }\n \n - (void)refresh {"
+    },
+    {
+      id: "c12", repo: "app", lane: 0,
+      title: "build: 更新 Podfile.lock 与组件基线版本",
+      author: "陈默", minutes: 980, time: "16 小时前", hash: "8e2d4f5",
+      branch: "master", card: "tieba02-88312", branches: ["master"],
+      files: [
+        { name: "Podfile.lock", st: "M", add: 18, del: 18 },
+        { name: "Components.baseline", st: "M", add: 6, del: 6 }
+      ],
+      diff: "@@ -12,9 +12,9 @@ PODS:\n-  - GdThread (1.1.8)\n-  - GdHome (1.2.1)\n-  - GdFeedSupports (2.0.4)\n+  - GdThread (1.2.0-beta.3)\n+  - GdHome (1.2.2)\n+  - GdFeedSupports (2.1.0)\n \n DEPENDENCIES:\n   - GdThread (from `components/GdThread`)"
+    },
+    {
+      id: "c13", repo: "video", lane: 2,
+      title: "feat(video): 半屏播放器支持手势返回",
+      author: "林子涵", minutes: 1200, time: "20 小时前", hash: "4b7e1a3",
+      branch: "feature/half-screen", card: "tieba02-88298", branches: ["feature/half-screen"],
+      files: [
+        { name: "GdVideo/Classes/Player/HalfScreenPlayer.m", st: "M", add: 52, del: 19 },
+        { name: "GdVideo/Classes/Gesture/PlayerPanGesture.m", st: "A", add: 37, del: 0 }
+      ],
+      diff: "@@ -33,6 +33,17 @@ - (void)viewDidLoad {\n     [self setupPlayer];\n+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];\n+    [self.view addGestureRecognizer:pan];\n }\n+\n+- (void)handlePan:(UIPanGestureRecognizer *)pan {\n+    CGPoint translation = [pan translationInView:self.view];\n+    if (translation.y > 80 && pan.state == UIGestureRecognizerStateEnded) {\n+        [self dismissViewControllerAnimated:YES completion:nil];\n+    }\n+}"
+    },
+    {
+      id: "c14", repo: "app", lane: 1, merge: true,
+      title: "合并 release/1.1 到 master",
+      author: "周野", minutes: 2400, time: "昨天", hash: "6c0d9b2",
+      branch: "master", card: "tieba02-88210", branches: ["master", "tag/1.1.0"],
+      files: [
+        { name: "app/Classes/Release/Version.m", st: "M", add: 2, del: 2 }
+      ],
+      diff: "@@ -1,4 +1,4 @@\n #import \"Version.h\"\n \n-NSString *const kAppVersion = @\"1.1.0-rc.4\";\n+NSString *const kAppVersion = @\"1.1.0\";"
+    },
+    {
+      id: "c15", repo: "thread", lane: 3,
+      title: "docs: 补充线程模块 README 与接入说明",
+      author: "苏晚", minutes: 3200, time: "昨天", hash: "a2f8c60",
+      branch: "develop", card: "tieba02-88190", branches: ["develop"],
+      files: [
+        { name: "GdThread/README.md", st: "M", add: 46, del: 3 }
+      ],
+      diff: "@@ -1,5 +1,13 @@\n # GdThread\n \n+## 接入方式\n+\n+```ruby\n+pod 'GdThread', :path => 'components/GdThread'\n+```\n+\n+## 二级评论\n+\n+通过 `FeatureFlags.threadSecondLevelComment` 控制开关。"
+    },
+    {
+      id: "c16", repo: "app", lane: 0,
+      title: "chore: 初始化 1.2 迭代配置",
+      author: "何嘉", minutes: 5000, time: "2 天前", hash: "d9e3a47",
+      branch: "master", card: "tieba02-88102", branches: ["master"],
+      files: [
+        { name: "app/Config/Iteration.plist", st: "A", add: 24, del: 0 }
+      ],
+      diff: "@@ -0,0 +1,10 @@\n+<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n+<plist version=\"1.0\">\n+<dict>\n+  <key>iteration</key><string>1.2</string>\n+  <key>owner</key><string>陈默</string>\n+  <key>startDate</key><string>2026-10-20</string>\n+</dict>\n+</plist>"
+    }
+  ];
+
+  const CHANGESETS = [
+    {
+      id: "tieba02-88421", title: "楼层二级评论展开 + 信息流占位图修复", total: 3, commits: ["c1", "c2", "c4"], status: "ready"
+    },
+    {
+      id: "tieba02-88377", title: "长按菜单适配 & 信息流预加载实验", total: 2, commits: ["c6", "c7"], status: "ready"
+    },
+    {
+      id: "tieba02-88340", title: "曝光埋点 v2 & 移除废弃卡片组件", total: 3, commits: ["c9", "c10"], status: "missing"
+    },
+    {
+      id: "tieba02-88312", title: "个人页关注数刷新 & 1.2 基线更新", total: 2, commits: ["c11", "c12"], status: "ready"
+    }
+  ];
+
+  const FILES_BY_ID = {};
+  COMMITS.forEach(c => { FILES_BY_ID[c.id] = c; });
+
+  const state = {
+    view: "timeline",
+    repo: "all",
+    branch: "all",
+    author: "all",
+    date: "all",
+    query: "",
+    selectedCommit: "c1",
+    selectedFile: 0,
+    selectedRepos: new Set(),
+    repoSearch: "",
+    extraRepos: [],
+    theme: "dark",
+    cardQuery: "tieba02-88421",
+    searched: false,
+    changeSetOpen: new Set(["tieba02-88421"]),
+    batches: {}
+  };
+
+  const $ = (sel, el) => (el || document).querySelector(sel);
+  const $$ = (sel, el) => Array.prototype.slice.call((el || document).querySelectorAll(sel));
+  const esc = s => String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  const repoOf = id => REPOS.find(r => r.id === id) || { name: id, color: "#6f8dff", branch: "-", path: "" };
+
+  /* ------------------------------ toast ------------------------------ */
+  function toast(msg, type) {
+    const el = document.createElement("div");
+    el.className = "toast" + (type === "info" ? " info" : "");
+    el.innerHTML = '<span class="ic">' + (type === "info" ? "i" : "✓") + "</span><span>" + esc(msg) + "</span>";
+    $("#toasts").appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(6px)";
+      el.style.transition = ".2s";
+      setTimeout(() => el.remove(), 220);
+    }, 2600);
+  }
+
+  /* ------------------------------ sidebar ------------------------------ */
+  function renderSidebar() {
+    const list = $("#repoList");
+    const kw = state.repoSearch.trim().toLowerCase();
+    const repos = REPOS.filter(r => !kw || r.name.toLowerCase().includes(kw) || r.branch.toLowerCase().includes(kw));
+    if (!repos.length) {
+      list.innerHTML = '<div class="empty" style="padding:24px 10px">没有匹配的仓库</div>';
+    } else {
+      list.innerHTML = repos.map(r => {
+        const active = state.repo === r.id;
+        return '<div class="repo-item' + (active ? " active" : "") + '" data-repo="' + r.id + '">' +
+          '<span class="repo-color" style="background:' + r.color + '"></span>' +
+          '<div class="repo-content">' +
+            '<div class="repo-line"><span class="repo-name">' + esc(r.name) + "</span>" +
+              '<span class="repo-flags">' + repoFlags(r) + "</span>" +
+            "</div>" +
+            '<div class="repo-branch">' + esc(r.branch) + "</div>" +
+          "</div>" +
+        "</div>";
+      }).join("");
+    }
+    $("#repoCount").textContent = REPOS.length;
+    $$("#repoList .repo-item").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.repo;
+        state.repo = state.repo === id ? "all" : id;
+        state.view = "timeline";
+        $("#repoFilter").value = state.repo;
+        renderSidebar(); renderTimeline(); renderDetail(); syncTabs();
+      });
+    });
+  }
+
+  function repoFlags(r) {
+    let out = "";
+    if (r.dirty > 0) out += '<span class="flag dirty" title="未提交改动">●' + r.dirty + "</span>";
+    if (r.ahead > 0) out += '<span class="flag up" title="领先远程">↑' + r.ahead + "</span>";
+    if (r.behind > 0) out += '<span class="flag down" title="落后远程">↓' + r.behind + "</span>";
+    if (!out) out = '<span class="flag clean">✓</span>';
+    return out;
+  }
+
+  /* ------------------------------ graph ------------------------------ */
+  function graphSVG(commit, next) {
+    const lane = commit.lane || 0;
+    const x = l => 15 + l * 12;
+    const color = repoOf(commit.repo).color;
+    let s = '<svg width="56" height="54" viewBox="0 0 56 54" aria-hidden="true">';
+    s += '<line x1="' + x(lane) + '" y1="0" x2="' + x(lane) + '" y2="54" stroke="' + color + '" stroke-opacity=".28" stroke-width="2"/>';
+    if (next && (next.lane || 0) !== lane) {
+      const nx = x(next.lane || 0);
+      s += '<path d="M ' + x(lane) + ' 27 C ' + x(lane) + ' 38, ' + nx + ' 16, ' + nx + ' 27" fill="none" stroke="' + color + '" stroke-opacity=".45" stroke-width="2"/>';
+      s += '<line x1="' + nx + '" y1="27" x2="' + nx + '" y2="54" stroke="' + repoOf(next.repo).color + '" stroke-opacity=".28" stroke-width="2"/>';
+    }
+    s += '<circle cx="' + x(lane) + '" cy="27" r="4.4" fill="' + color + '" stroke="var(--bg)" stroke-width="2.4"/>';
+    s += "</svg>";
+    return s;
+  }
+
+  function authorColor(name) {
+    const i = AUTHORS.indexOf(name);
+    return AUTHOR_COLORS[i >= 0 ? i % AUTHOR_COLORS.length : 0];
+  }
+
+  /* ------------------------------ timeline ------------------------------ */
+  function filteredCommits() {
+    const q = state.query.trim().toLowerCase();
+    return COMMITS.filter(c => {
+      if (state.repo !== "all" && c.repo !== state.repo) return false;
+      if (state.author !== "all" && c.author !== state.author) return false;
+      if (state.date === "today" && c.minutes > 600) return false;
+      if (state.date === "week" && c.minutes > 7 * 24 * 60) return false;
+      if (state.date === "month" && c.minutes > 30 * 24 * 60) return false;
+      if (state.branch !== "all") {
+        const b = c.branch.toLowerCase();
+        if (state.branch === "feature" && !b.includes("feature")) return false;
+        if (state.branch !== "feature" && !b.includes(state.branch)) return false;
+      }
+      if (q) {
+        const hay = (c.title + " " + c.hash + " " + c.card + " " + c.author + " " + repoOf(c.repo).name).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderTimeline() {
+    const list = filteredCommits();
+    $("#commitCount").textContent = list.length;
+    if (!list.length) {
+      $("#commitList").innerHTML = '<div class="empty-state"><div class="big">◌</div>没有符合条件的提交<br/>试试调整仓库、作者或时间筛选</div>';
+      return;
+    }
+    $("#commitList").innerHTML = list.map((c, i) => {
+      const r = repoOf(c.repo);
+      const selected = c.id === state.selectedCommit;
+      return '<div class="commit-row' + (selected ? " selected" : "") + '" data-commit="' + c.id + '">' +
+        '<div class="graph">' + graphSVG(c, list[i + 1]) + "</div>" +
+        '<div class="commit-main">' +
+          '<div class="commit-title">' + esc(c.title) +
+            (c.merge ? '<span class="merge-tag">MERGE</span>' : "") +
+          "</div>" +
+          '<div class="commit-meta">' +
+            '<span class="avatar" style="background:' + authorColor(c.author) + '">' + esc(c.author.slice(0, 1)) + "</span>" +
+            '<span class="author">' + esc(c.author) + "</span>" +
+            '<span class="hash">' + esc(c.hash) + "</span>" +
+            '<span style="color:var(--faint)">' + esc(c.card) + "</span>" +
+          "</div>" +
+        "</div>" +
+        '<div class="commit-repo">' +
+          '<button class="repo-chip" data-filter-repo="' + c.repo + '" title="只看该仓库"><i style="background:' + r.color + '"></i>' + esc(r.name) + "</button>" +
+          '<span class="branch-tag">' + esc(c.branch) + "</span>" +
+        "</div>" +
+        '<div class="commit-side">' + esc(c.time) + '<div class="hash">' + esc(c.hash) + "</div></div>" +
+      "</div>";
+    }).join("");
+
+    $$("#commitList .commit-row").forEach(row => {
+      row.addEventListener("click", e => {
+        if (e.target.closest("[data-filter-repo]")) return;
+        state.selectedCommit = row.dataset.commit;
+        state.selectedFile = 0;
+        renderTimeline(); renderDetail();
+      });
+    });
+    $$("#commitList [data-filter-repo]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        state.repo = btn.dataset.filterRepo;
+        $("#repoFilter").value = state.repo;
+        renderSidebar(); renderTimeline(); renderDetail();
+        toast("已按仓库 " + repoOf(state.repo).name + " 过滤时间线", "info");
+      });
+    });
+  }
+
+  /* ------------------------------ detail ------------------------------ */
+  function renderDetail() {
+    const c = FILES_BY_ID[state.selectedCommit] || COMMITS[0];
+    const r = repoOf(c.repo);
+    const files = c.files || [];
+    const totalAdd = files.reduce((s, f) => s + f.add, 0);
+    const totalDel = files.reduce((s, f) => s + f.del, 0);
+    const selFile = files[state.selectedFile] || files[0];
+
+    let diffEl = "";
+    if (selFile) {
+      const lines = (c.diff || "").split("\n").map(line => {
+        let cls = "ctx";
+        if (line.startsWith("+")) cls = "add";
+        else if (line.startsWith("-")) cls = "del";
+        else if (line.startsWith("@@")) cls = "hunk";
+        return '<span class="ln ' + cls + '">' + esc(line || " ") + "</span>";
+      }).join("");
+      diffEl = '<div class="diff"><div class="diff-head"><span>' + esc(selFile.name.split("/").pop()) + "</span><span>" + esc(selFile.st) + " · +" + selFile.add + " −" + selFile.del + "</span></div><pre>" + lines + "</pre></div>";
+    }
+
+    $("#detail").innerHTML =
+      '<div class="detail-head">' +
+        '<div class="detail-kicker"><span style="color:' + r.color + '">●</span><span>' + esc(r.name) + '</span><span>/</span><span class="sha">' + esc(c.hash) + "</span>" + (c.merge ? '<span class="merge-tag">MERGE</span>' : "") + "</div>" +
+        '<h2 class="detail-title">' + esc(c.title) + "</h2>" +
+        '<div class="detail-author"><span class="avatar" style="background:' + authorColor(c.author) + '">' + esc(c.author.slice(0, 1)) + "</span><b>" + esc(c.author) + "</b><span>提交于 " + esc(c.time) + "</span></div>" +
+        '<div class="detail-meta-grid">' +
+          '<div><div class="k">仓库</div><div class="v" style="font-family:inherit">' + esc(r.name) + "</div></div>" +
+          '<div><div class="k">分支</div><div class="v">' + esc(c.branch) + "</div></div>" +
+          '<div><div class="k">卡片号</div><div class="v" style="color:var(--accent)">' + esc(c.card) + "</div></div>" +
+          '<div><div class="k">远程状态</div><div class="v" style="font-family:inherit;color:var(--green)">已推送</div></div>' +
+        "</div>" +
+        '<div class="detail-actions">' +
+          '<button class="btn btn-sm" data-toast="已在 ' + esc(r.name) + ' 仓库中定位该提交">在仓库中查看</button>' +
+          '<button class="btn btn-sm" data-toast="已复制提交 hash ' + esc(c.hash) + '">复制 hash</button>' +
+          '<button class="btn btn-sm" data-toast="已创建 Cherry-pick 任务">Cherry-pick</button>' +
+        "</div>" +
+      "</div>" +
+      '<div class="detail-body">' +
+        '<div class="detail-section-title"><span>改动文件 · ' + files.length + '</span><span class="stat"><span class="add">+' + totalAdd + '</span> <span class="del">−' + totalDel + "</span></span></div>" +
+        files.map((f, i) =>
+          '<div class="file-row' + (i === state.selectedFile ? " active" : "") + '" data-file="' + i + '">' +
+            '<span class="file-status ' + (f.st === "A" ? "add" : f.st === "D" ? "del" : "mod") + '">' + f.st + "</span>" +
+            '<span class="file-name">' + esc(f.name) + "</span>" +
+            '<span class="file-stat"><span class="a">+' + f.add + '</span> <span class="d">−' + f.del + "</span></span>" +
+          "</div>").join("") +
+        diffEl +
+      "</div>";
+
+    $$("#detail [data-file]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.selectedFile = Number(el.dataset.file);
+        renderDetail();
+      });
+    });
+    $$("#detail [data-toast]").forEach(el => {
+      el.addEventListener("click", () => toast(el.dataset.toast));
+    });
+  }
+
+  /* ------------------------------ status ------------------------------ */
+  function renderStatus() {
+    $("#statusBody").innerHTML = REPOS.map(r => {
+      const checked = state.selectedRepos.has(r.id);
+      const sync = (r.ahead || r.behind)
+        ? '<span class="up">↑' + r.ahead + '</span> <span class="down">↓' + r.behind + "</span>"
+        : '<span class="zero">已同步</span>';
+      const dirty = r.dirty > 0
+        ? '<span class="pill warn">● ' + r.dirty + " 个未提交</span>"
+        : '<span class="pill ok">✓ 干净</span>';
+      const unpushed = r.unpushed > 0
+        ? '<span class="pill neutral">' + r.unpushed + " 条</span>"
+        : '<span style="color:var(--faint)">—</span>';
+      const conflict = r.id === "thread" && r.behind > 0;
+      return "<tr" + (checked ? ' class="checked"' : "") + ">" +
+        '<td><input type="checkbox" data-check="' + r.id + '"' + (checked ? " checked" : "") + " /></td>" +
+        '<td><div class="rname"><span class="repo-color" style="background:' + r.color + '"></span>' + esc(r.name) + "</div><div class=\"rpath\">" + esc(r.path) + "</div></td>" +
+        "<td><span class=\"branch-tag\">" + esc(r.branch) + "</span></td>" +
+        '<td class="sync">' + sync + "</td>" +
+        "<td>" + dirty + "</td>" +
+        '<td class="muted-cell">' + unpushed + "</td>" +
+        '<td class="muted-cell">' + esc(r.fetched) + "</td>" +
+        '<td><div class="row-actions">' +
+          '<button class="mini-btn" data-action="fetch" data-repo="' + r.id + '">Fetch</button>' +
+          '<button class="mini-btn" data-action="pull" data-repo="' + r.id + '">Pull</button>' +
+          '<button class="mini-btn" data-action="open" data-repo="' + r.id + '">打开</button>' +
+        "</div></td>" +
+      "</tr>";
+    }).join("");
+
+    $$("#statusBody [data-check]").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const id = cb.dataset.check;
+        if (cb.checked) state.selectedRepos.add(id); else state.selectedRepos.delete(id);
+        const tr = cb.closest("tr");
+        if (tr) tr.classList.toggle("checked", cb.checked);
+        updateBulkbar();
+        updateSelectAll();
+      });
+    });
+    $$("#statusBody [data-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const r = REPOS.find(x => x.id === btn.dataset.repo);
+        if (!r) return;
+        const act = btn.dataset.action;
+        if (act === "open") { toast("已打开 " + r.name + " 的单仓视图", "info"); return; }
+        state.selectedRepos = new Set([r.id]);
+        runBatch(act);
+      });
+    });
+
+    const stats = {
+      repos: REPOS.length,
+      clean: REPOS.filter(r => r.dirty === 0).length,
+      sync: REPOS.filter(r => r.ahead > 0 || r.behind > 0).length,
+      conflict: REPOS.filter(r => r.id === "thread").length
+    };
+    $("#statRepos").innerHTML = stats.repos + "<small>个</small>";
+    $("#statClean").innerHTML = stats.clean + "<small>个</small>";
+    $("#statSync").innerHTML = stats.sync + "<small>个</small>";
+    $("#statConflict").innerHTML = stats.conflict + "<small>个</small>";
+    $("#tabStatusCount").textContent = stats.sync;
+    updateBulkbar();
+    updateSelectAll();
+  }
+
+  function updateBulkbar() {
+    const n = state.selectedRepos.size;
+    const bar = $("#bulkbar");
+    bar.style.display = n ? "flex" : "none";
+    $("#bulkCount").textContent = n;
+  }
+
+  function updateSelectAll() {
+    const all = $("#selectAll");
+    const n = state.selectedRepos.size;
+    all.checked = n === REPOS.length && REPOS.length > 0;
+    all.indeterminate = n > 0 && n < REPOS.length;
+  }
+
+  /* ------------------------------ batches ------------------------------ */
+  function runBatch(kind) {
+    const ids = Array.from(state.selectedRepos);
+    if (!ids.length) { toast("请先在状态总览中选择仓库", "info"); return; }
+    const kindLabel = kind === "fetch" ? "Fetch" : kind === "pull" ? "Pull" : "Push";
+    $("#batchTitle").textContent = "批量 " + kindLabel;
+    $("#batchSub").textContent = "正在对 " + ids.length + " 个仓库执行 " + kindLabel + "，请稍候…";
+    $("#batchBody").innerHTML = ids.map(id => {
+      const r = REPOS.find(x => x.id === id);
+      return '<div class="batch-line" data-batch-repo="' + id + '">' +
+        '<span class="repo-color" style="background:' + r.color + '"></span>' +
+        "<span>" + esc(r.name) + "</span>" +
+        '<span class="st"><span class="spinner"></span> 等待中</span>' +
+      "</div>";
+    }).join("");
+    openOverlay("batchOverlay");
+
+    let i = 0;
+    const step = () => {
+      if (i >= ids.length) {
+        const failed = ids.filter(id => id === "thread" && kind === "pull").length;
+        $("#batchSub").textContent = "全部完成 · 成功 " + (ids.length - failed) + " 个" + (failed ? "，1 个需要处理冲突" : "");
+        if (failed) toast("GdThread 存在冲突，请在单仓视图解决后再继续", "info");
+        else toast("批量 " + kindLabel + " 完成，共更新 " + ids.length + " 个仓库");
+        state.selectedRepos.clear();
+        renderStatus(); renderSidebar();
+        return;
+      }
+      const id = ids[i];
+      const r = REPOS.find(x => x.id === id);
+      const line = $('[data-batch-repo="' + id + '"] .st');
+      if (line) line.innerHTML = '<span class="spinner"></span> 执行中';
+      setTimeout(() => {
+        let fail = false;
+        if (kind === "fetch") {
+          r.fetched = "刚刚";
+        } else if (kind === "pull") {
+          if (id === "thread") fail = true;
+          else { r.behind = 0; r.fetched = "刚刚"; }
+        } else {
+          r.ahead = 0; r.unpushed = 0; r.fetched = "刚刚";
+        }
+        const st = $('[data-batch-repo="' + id + '"] .st');
+        if (st) {
+          st.innerHTML = fail
+            ? '<span class="fail-ic">✕ 冲突</span>'
+            : '<span class="done-ic">✓ 完成</span>';
+        }
+        i += 1;
+        step();
+      }, 420);
+    };
+    step();
+  }
+
+  /* ------------------------------ changesets ------------------------------ */
+  function renderChangesets() {
+    $("#changesetList").innerHTML = CHANGESETS.map(cs => {
+      const commits = cs.commits.map(id => FILES_BY_ID[id]).filter(Boolean);
+      const repos = [];
+      commits.forEach(c => { if (!repos.includes(c.repo)) repos.push(c.repo); });
+      const done = cs.status === "ready" ? cs.total : cs.total - 1;
+      const pct = Math.round(done / cs.total * 100);
+      const open = state.changeSetOpen.has(cs.id);
+      const add = commits.reduce((s, c) => s + c.files.reduce((a, f) => a + f.add, 0), 0);
+      const del = commits.reduce((s, c) => s + c.files.reduce((a, f) => a + f.del, 0), 0);
+      const statusPill = cs.status === "ready"
+        ? '<span class="pill ok">✓ 已齐备</span>'
+        : '<span class="pill warn">缺 1 个仓库</span>';
+
+      const repoRows = repos.map(rid => {
+        const r = repoOf(rid);
+        const c = commits.find(x => x.repo === rid);
+        return '<div class="cs-repo-row">' +
+          '<span class="cs-check done">✓</span>' +
+          '<span class="cs-repo"><span class="repo-color" style="background:' + r.color + '"></span>' + esc(r.name) + "</span>" +
+          '<span class="cs-commit">' + esc(c.title) + "</span>" +
+          '<span class="cs-hash">' + esc(c.hash) + "</span>" +
+        "</div>";
+      }).join("") + (cs.status === "missing"
+        ? '<div class="cs-repo-row"><span class="cs-check miss">!</span><span class="cs-repo"><span class="repo-color" style="background:var(--faint)"></span>GdVideo</span><span class="cs-commit" style="color:var(--red)">尚未在该仓库发现关联提交</span><span class="cs-hash">—</span></div>'
+        : "");
+
+      return '<div class="cs-card' + (open ? " open" : "") + '" data-cs="' + cs.id + '">' +
+        '<div class="cs-main">' +
+          '<div class="cs-progress"><svg width="40" height="40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="3"/><circle cx="20" cy="20" r="16" fill="none" stroke="' + (cs.status === "ready" ? "var(--green)" : "var(--amber)") + '" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (2 * Math.PI * 16) + '" stroke-dashoffset="' + (2 * Math.PI * 16 * (1 - pct / 100)) + '"/></svg><span>' + done + "/" + cs.total + "</span></div>" +
+          '<div class="cs-info">' +
+            '<div class="cs-title"><span class="cs-card-id">' + cs.id + "</span>" + esc(cs.title) + "</div>" +
+            '<div class="cs-sub"><span>' + repos.length + ' 个仓库</span><span class="sep"></span><span>' + commits.length + ' 条提交</span><span class="sep"></span><span class="add">+' + add + '</span><span class="del">−' + del + "</span>" + (cs.status === "missing" ? '<span class="sep"></span><span style="color:var(--amber)">GdVideo 未提交</span>' : "") + "</div>" +
+          "</div>" +
+          '<div class="cs-right">' + statusPill + '<button class="mini-btn">' + (open ? "收起" : "展开") + "</button></div>" +
+        "</div>" +
+        '<div class="cs-detail">' + repoRows +
+          '<div class="cs-detail-foot"><button class="btn btn-sm" data-copy="' + cs.id + '">复制交付清单</button><button class="btn btn-sm" data-toast="已生成 CR 说明草稿">生成 CR 说明</button></div>' +
+        "</div>" +
+      "</div>";
+    }).join("");
+
+    $$("#changesetList .cs-main").forEach(main => {
+      main.addEventListener("click", () => {
+        const id = main.parentElement.dataset.cs;
+        if (state.changeSetOpen.has(id)) state.changeSetOpen.delete(id);
+        else state.changeSetOpen.add(id);
+        renderChangesets();
+      });
+    });
+    $$("#changesetList [data-copy]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        const id = btn.dataset.copy;
+        copyText(csText(id));
+        toast("已复制 " + id + " 的交付清单");
+      });
+    });
+    $$("#changesetList [data-toast]").forEach(btn => {
+      btn.addEventListener("click", e => { e.stopPropagation(); toast(btn.dataset.toast); });
+    });
+  }
+
+  function csText(id) {
+    const cs = CHANGESETS.find(x => x.id === id);
+    if (!cs) return "";
+    const lines = ["[" + cs.id + "] " + cs.title, ""];
+    cs.commits.forEach(cid => {
+      const c = FILES_BY_ID[cid];
+      if (c) lines.push("- " + repoOf(c.repo).name + " / " + c.hash + " / " + c.title);
+    });
+    if (cs.status === "missing") lines.push("- GdVideo / 待补充");
+    return lines.join("\n");
+  }
+
+  /* ------------------------------ search ------------------------------ */
+  function renderSearch() {
+    const box = $("#searchResult");
+    if (!state.searched) {
+      box.innerHTML = '<div class="empty-state"><div class="big"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="opacity:.55"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg></div>输入卡片号后点击「聚合检索」<br/>跨全部仓库匹配提交信息与卡片号</div>';
+      return;
+    }
+    const q = state.cardQuery.trim().toLowerCase();
+    const matches = COMMITS.filter(c => c.card.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
+    if (!matches.length) {
+      box.innerHTML = '<div class="empty-state"><div class="big">◌</div>没有找到与「' + esc(state.cardQuery) + '」相关的提交<br/>确认卡片号是否正确，或调整搜索范围</div>';
+      return;
+    }
+    const repos = [];
+    matches.forEach(c => { if (!repos.includes(c.repo)) repos.push(c.repo); });
+    const add = matches.reduce((s, c) => s + c.files.reduce((a, f) => a + f.add, 0), 0);
+    const del = matches.reduce((s, c) => s + c.files.reduce((a, f) => a + f.del, 0), 0);
+    const cs = CHANGESETS.find(x => x.id === state.cardQuery.trim());
+
+    let html = '<div class="result-summary">' +
+      '<div><div class="big">' + esc(state.cardQuery) + (cs ? " · " + esc(cs.title) : "") + "</div>" +
+      '<div class="metric" style="margin-top:4px">匹配提交 <b>' + matches.length + "</b> 条 · 涉及 <b>" + repos.length + "</b> 个仓库" + (cs ? " · 完整性 " + (cs.status === "ready" ? "已齐备" : "缺 1 仓") : "") + "</div></div>" +
+      '<div class="metric"><span class="add">+' + add + '</span> <span class="del">−' + del + "</span></div>" +
+      '<div class="right"><button class="btn btn-sm" id="copyManifest">复制交付清单</button><button class="btn btn-sm btn-primary" data-toast="已生成 CR 草稿并关联卡片">生成 CR</button></div>' +
+    "</div>";
+
+    html += repos.map(rid => {
+      const r = repoOf(rid);
+      const list = matches.filter(c => c.repo === rid);
+      return '<div class="result-group">' +
+        '<div class="rg-head"><span class="repo-color" style="background:' + r.color + '"></span><b>' + esc(r.name) + '</b><span class="br">' + esc(r.branch) + '</span><span class="pill neutral">' + list.length + " 条提交</span></div>" +
+        list.map(c =>
+          '<div class="rg-commit">' +
+            '<span class="dot" style="background:' + r.color + '"></span>' +
+            '<span class="t">' + esc(c.title) + "</span>" +
+            '<span class="h">' + esc(c.hash) + "</span>" +
+            '<span class="a">' + esc(c.author) + "</span>" +
+          "</div>").join("") +
+      "</div>";
+    }).join("");
+
+    box.innerHTML = html;
+    const copyBtn = $("#copyManifest");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        const text = "[" + state.cardQuery + "] 跨仓交付清单\n" + repos.map(rid => {
+          return matches.filter(c => c.repo === rid).map(c => "- " + repoOf(rid).name + " / " + c.hash + " / " + c.title).join("\n");
+        }).join("\n");
+        copyText(text);
+        toast("交付清单已复制到剪贴板");
+      });
+    }
+    $$("#searchResult [data-toast]").forEach(b => b.addEventListener("click", () => toast(b.dataset.toast)));
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }
+
+  /* ------------------------------ views ------------------------------ */
+  function syncTabs() {
+    $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === state.view));
+    $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + state.view));
+    if (state.view === "status") renderStatus();
+    if (state.view === "changeset") renderChangesets();
+    if (state.view === "search") renderSearch();
+  }
+
+  function setView(v) {
+    state.view = v;
+    syncTabs();
+    if (v === "search" && !state.searched) {
+      setTimeout(runCardSearch, 180);
+    }
+  }
+
+  /* ------------------------------ overlays ------------------------------ */
+  function openOverlay(id) { $("#" + id).classList.add("show"); }
+  function closeOverlay(id) { $("#" + id).classList.remove("show"); }
+
+  $$("[data-close]").forEach(btn => {
+    btn.addEventListener("click", () => closeOverlay(btn.dataset.close));
+  });
+  $$(".overlay").forEach(ov => {
+    ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("show"); });
+  });
+
+  /* ------------------------------ add repo ------------------------------ */
+  $("#addRepoBtn").addEventListener("click", () => {
+    $("#repoPathInput").value = "";
+    $("#repoNameInput").value = "";
+    openOverlay("addRepoOverlay");
+    setTimeout(() => $("#repoPathInput").focus(), 120);
+  });
+
+  $("#confirmAddRepo").addEventListener("click", () => {
+    const path = $("#repoPathInput").value.trim();
+    if (!path) { toast("请填写本地路径", "info"); return; }
+    const name = $("#repoNameInput").value.trim() || decodeURIComponent(path.split("/").filter(Boolean).pop() || "repo");
+    if (REPOS.some(r => r.name === name)) { toast("仓库 " + name + " 已在工作区中", "info"); return; }
+    REPOS.push({
+      id: "r" + Date.now(), name: name, path: path, branch: "master",
+      ahead: 0, behind: 0, dirty: 0, unpushed: 0, fetched: "刚刚",
+      color: ["#6f8dff", "#3ddc97", "#f4b25c", "#c78dff", "#5cc9e8"][REPOS.length % 5]
+    });
+    closeOverlay("addRepoOverlay");
+    refreshRepoOptions();
+    renderSidebar(); renderStatus(); renderChangesets();
+    toast("已添加仓库 " + name);
+  });
+
+  /* ------------------------------ scan ------------------------------ */
+  $("#scanRepoBtn").addEventListener("click", () => {
+    $("#scanArea").innerHTML = "";
+    $("#confirmScan").disabled = true;
+    openOverlay("scanOverlay");
+  });
+
+  const DISCOVERED = [
+    { name: "GdComment", path: "components/GdComment" },
+    { name: "GdSearch", path: "components/GdSearch" },
+    { name: "GdSettings", path: "components/GdSettings" },
+    { name: "GdThread", path: "components/GdThread", exists: true },
+    { name: "GdHome", path: "components/GdHome", exists: true }
+  ];
+
+  $("#doScan").addEventListener("click", () => {
+    $("#scanArea").innerHTML = '<div class="scan-box"><span class="pulse"></span> 正在扫描 ' + esc($("#scanPathInput").value) + " …</div>";
+    $("#confirmScan").disabled = true;
+    setTimeout(() => {
+      $("#scanArea").innerHTML = '<div style="font-size:11px;color:var(--faint);margin:10px 0 2px">发现 5 个 Git 仓库，已纳管 2 个</div>' +
+        '<div class="discover-list">' + DISCOVERED.map((d, i) =>
+          '<label class="discover-item"><input type="checkbox" ' + (d.exists ? "disabled" : "checked") + ' data-scan="' + i + '" />' +
+          '<span class="nm">' + d.name + "</span>" +
+          '<span class="pt">' + d.path + "</span>" +
+          (d.exists ? '<span class="pill neutral">已纳管</span>' : "") +
+          "</label>").join("") + "</div>" +
+        '<div style="font-size:10.5px;color:var(--faint);margin-top:8px">扫描会跳过 node_modules、build、DerivedData 等构建产物目录。</div>';
+      $("#confirmScan").disabled = false;
+    }, 900);
+  });
+
+  $("#confirmScan").addEventListener("click", () => {
+    const picked = $$("#scanArea [data-scan]").filter(cb => cb.checked && !cb.disabled).map(cb => DISCOVERED[Number(cb.dataset.scan)]);
+    if (!picked.length) { toast("请先勾选要导入的仓库", "info"); return; }
+    picked.forEach((d, idx) => {
+      REPOS.push({
+        id: "scan" + Date.now() + idx, name: d.name, path: "~/dev/tieba-ios/" + d.path,
+        branch: "master", ahead: 0, behind: 0, dirty: 0, unpushed: 0, fetched: "刚刚",
+        color: ["#8fd3a8", "#ff8fa3", "#5cc9e8", "#c78cff"][idx % 4]
+      });
+    });
+    closeOverlay("scanOverlay");
+    refreshRepoOptions();
+    renderSidebar(); renderStatus();
+    toast("已导入 " + picked.length + " 个仓库到工作区");
+  });
+
+  $("#importManifestBtn").addEventListener("click", () => {
+    toast("已识别 mgit 清单，导入 12 个仓库（原型演示）", "info");
+  });
+
+  /* ------------------------------ filters ------------------------------ */
+  function refreshRepoOptions() {
+    const options = ['<option value="all">全部仓库 (' + REPOS.length + ")</option>"]
+      .concat(REPOS.map(r => '<option value="' + r.id + '">' + esc(r.name) + "</option>"));
+    $("#repoFilter").innerHTML = options.join("");
+    $("#repoFilter").value = REPOS.some(r => r.id === state.repo) ? state.repo : "all";
+    $("#authorFilter").innerHTML = ['<option value="all">全部作者</option>']
+      .concat(AUTHORS.map(a => '<option value="' + a + '">' + a + "</option>")).join("");
+    $("#authorFilter").value = state.author;
+  }
+
+  $("#repoFilter").addEventListener("change", e => {
+    state.repo = e.target.value;
+    renderSidebar(); renderTimeline(); renderDetail();
+  });
+  $("#branchFilter").addEventListener("change", e => { state.branch = e.target.value; renderTimeline(); });
+  $("#authorFilter").addEventListener("change", e => { state.author = e.target.value; renderTimeline(); });
+  $("#dateFilter").addEventListener("change", e => { state.date = e.target.value; renderTimeline(); });
+  $("#commitSearch").addEventListener("input", e => {
+    state.query = e.target.value;
+    renderTimeline();
+  });
+  $("#resetFilters").addEventListener("click", () => {
+    state.repo = "all"; state.branch = "all"; state.author = "all"; state.date = "all"; state.query = "";
+    $("#repoFilter").value = "all"; $("#branchFilter").value = "all"; $("#authorFilter").value = "all";
+    $("#dateFilter").value = "all"; $("#commitSearch").value = "";
+    renderSidebar(); renderTimeline(); renderDetail();
+    toast("已清除全部筛选条件", "info");
+  });
+
+  $("#repoSearch").addEventListener("input", e => {
+    state.repoSearch = e.target.value;
+    renderSidebar();
+  });
+
+  /* ------------------------------ misc interactions ------------------------------ */
+  $$(".tab").forEach(tab => tab.addEventListener("click", () => setView(tab.dataset.view)));
+
+  $("#refreshBtn").addEventListener("click", () => {
+    const t = new Date();
+    const hh = String(t.getHours()).padStart(2, "0");
+    const mm = String(t.getMinutes()).padStart(2, "0");
+    $("#lastRefresh").textContent = "上次刷新 " + hh + ":" + mm;
+    REPOS.forEach(r => { r.fetched = "刚刚"; });
+    renderSidebar(); renderStatus();
+    toast("已刷新 " + REPOS.length + " 个仓库的远程状态");
+  });
+
+  $("#batchFetchTop").addEventListener("click", () => {
+    state.selectedRepos = new Set(REPOS.map(r => r.id));
+    runBatch("fetch");
+  });
+
+  $("#selectAll").addEventListener("change", e => {
+    state.selectedRepos.clear();
+    if (e.target.checked) REPOS.forEach(r => state.selectedRepos.add(r.id));
+    renderStatus();
+  });
+
+  $("#selectDirty").addEventListener("click", () => {
+    state.selectedRepos = new Set(REPOS.filter(r => r.dirty > 0 || r.ahead > 0 || r.behind > 0).map(r => r.id));
+    renderStatus();
+    toast("已选中 " + state.selectedRepos.size + " 个待同步仓库", "info");
+  });
+
+  $("#clearSelect").addEventListener("click", () => {
+    state.selectedRepos.clear();
+    renderStatus();
+  });
+
+  $$("[data-batch]").forEach(btn => {
+    btn.addEventListener("click", () => runBatch(btn.dataset.batch));
+  });
+
+  $("#loadMore").addEventListener("click", () => {
+    toast("已加载 1.2 迭代开始前的提交（原型演示）", "info");
+  });
+
+  function runCardSearch() {
+    state.cardQuery = $("#cardInput").value.trim() || "tieba02-88421";
+    state.searched = true;
+    const box = $("#searchResult");
+    box.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto 12px"></div>正在跨 ' + REPOS.length + " 个仓库聚合提交…</div>";
+    setTimeout(() => { renderSearch(); }, 560);
+  }
+
+  $("#cardSearchBtn").addEventListener("click", runCardSearch);
+
+  $("#cardInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") runCardSearch();
+  });
+
+  $$(".quick-card").forEach(q => {
+    q.addEventListener("click", () => {
+      $("#cardInput").value = q.dataset.card;
+      $("#cardSearchBtn").click();
+    });
+  });
+
+  /* theme */
+  $("#themeBtn").addEventListener("click", () => {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", state.theme);
+    $("#themeIcon").innerHTML = state.theme === "dark"
+      ? '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>'
+      : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round"/>';
+    toast("已切换为" + (state.theme === "dark" ? "深色" : "浅色") + "主题", "info");
+  });
+
+  /* keyboard */
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      $("#repoSearch").focus();
+    }
+    if (e.key === "Escape") {
+      $$(".overlay.show").forEach(ov => ov.classList.remove("show"));
+    }
+  });
+
+  /* ------------------------------ init ------------------------------ */
+  refreshRepoOptions();
+  renderSidebar();
+  renderTimeline();
+  renderDetail();
+  renderStatus();
+  renderChangesets();
+  renderSearch();
+  syncTabs();
+
+  const hashView = (location.hash || "").replace("#", "");
+  if (["timeline", "status", "changeset", "search"].indexOf(hashView) >= 0) setView(hashView);
+
+  setTimeout(() => toast("工作区已就绪 · 统一时间线加载 16 条跨仓提交", "info"), 600);
+})();
+</script>
+</body>
+</html>
