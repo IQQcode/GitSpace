@@ -98,7 +98,9 @@ struct ScanSheetView: View {
     @State private var isImporting = false
 
     private var importable: [DiscoveredRepo] {
-        discovered.filter { !($0.alreadyManaged && !selected.contains($0.id)) && !app.repos.contains { $0.config.path == $0.id } && selected.contains($0.id) }
+        discovered.filter { repo in
+            !(repo.alreadyManaged && !selected.contains(repo.id)) && !app.repos.contains { $0.config.path == repo.id } && selected.contains(repo.id)
+        }
     }
 
     var body: some View {
@@ -208,7 +210,9 @@ struct ScanSheetView: View {
 
     private func importSelected() {
         isImporting = true
-        let picked = discovered.filter { selected.contains($0.id) && !app.repos.contains { $0.config.path == $0.id } }
+        let picked = discovered.filter { repo in
+            selected.contains(repo.id) && !app.repos.contains { $0.config.path == repo.id }
+        }
         Task {
             await app.importDiscovered(picked)
             isImporting = false
