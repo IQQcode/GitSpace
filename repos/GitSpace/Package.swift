@@ -1,7 +1,7 @@
 // swift-tools-version:6.0
 // GitSpace 多模块工程（TechStack §9）。
-// 依赖方向单向：App → GSFeatures → (GSGitEngine, GSIndex, GSDesignKit) → GSInfra。
-// GSGitEngine / GSIndex 不 import SwiftUI。
+// 依赖方向单向：App → GSFeatures / GSMCP → (GSGitEngine, GSIndex, GSDesignKit) → GSInfra。
+// GSGitEngine / GSIndex / GSMCP 不 import SwiftUI。
 import PackageDescription
 
 let package = Package(
@@ -35,9 +35,17 @@ let package = Package(
             dependencies: ["GSGitEngine", "GSIndex", "GSDesignKit", "GSInfra"],
             path: "Packages/GSFeatures/Sources/GSFeatures"
         ),
+        .target(
+            name: "GSMCP",
+            dependencies: ["GSGitEngine", "GSIndex", "GSInfra"],
+            path: "Packages/GSMCP/Sources/GSMCP",
+            resources: [
+                .copy("Skill")
+            ]
+        ),
         .executableTarget(
             name: "GitSpaceApp",
-            dependencies: ["GSFeatures", "GSGitEngine", "GSIndex", "GSDesignKit", "GSInfra"],
+            dependencies: ["GSFeatures", "GSMCP", "GSGitEngine", "GSIndex", "GSDesignKit", "GSInfra"],
             path: "App/Sources/GitSpaceApp"
         ),
         .target(
@@ -54,6 +62,11 @@ let package = Package(
             name: "GSIndexTests",
             dependencies: ["GSIndex", "GSTestSupport"],
             path: "Tests/GSIndexTests"
+        ),
+        .testTarget(
+            name: "GSMCPTests",
+            dependencies: ["GSMCP", "GSGitEngine", "GSTestSupport"],
+            path: "Tests/GSMCPTests"
         )
     ],
     swiftLanguageModes: [.v6]

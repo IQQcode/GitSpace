@@ -17,6 +17,16 @@ public enum GSPaths {
         appSupportRoot.appendingPathComponent("logs", isDirectory: true)
     }
 
+    /// 应用配置（GUI 与 MCP server 共读共写）：`{"mcpWritesEnabled": Bool}`。
+    public static var configFile: URL {
+        appSupportRoot.appendingPathComponent("config.json")
+    }
+
+    /// skill 安装清单：记录已装 git-spece 的版本与时间（Story-1031-mcp）。
+    public static var skillInstallManifest: URL {
+        appSupportRoot.appendingPathComponent("skill-install.json")
+    }
+
     @discardableResult
     public static func ensureDirectory(_ url: URL) throws -> URL {
         var isDirectory: ObjCBool = false
