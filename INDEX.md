@@ -2,7 +2,7 @@
 
 快速定位各资产与模块。**动文档或代码前先看本索引**；结构与职责的完整说明见 `docs/repo-structure.md`。
 
-最后更新：2026-10-31。MVP 已落地并完成 Story-1030 界面对齐原型（顶部 TitleBar / 五视图 tab / 命令面板 / 四类弹窗，构建通过）；工程在 `repos/GitSpace`。新增 `docs/epic/` 功能缺口与规划（待评审）。
+最后更新：2026-10-31。MVP 与 Story-1030 界面对齐已落地；Story-1031 批次 A 第一批（交互底座 + 看与改核心 17 项 P0）已实施，47 测试全绿；工程在 `repos/GitSpace`。`docs/epic/` 功能缺口与规划（待评审）为排期入口。
 
 ## 一、文档资产
 
@@ -14,6 +14,7 @@
 | `specs/Story-1029-mvp-plan/` | 已确认（回溯归档） | MVP 方案事实源（spec-flow 格式）：doc.md 设计 + tasks.md 执行契约（W1–W14 全部 ✅ 含复核证据） | 14 个工作项全部完成；MRD 10.4 的 3/4/9/10/11/12/13 条已自动化 |
 | `specs/Story-1029-mvp-coding/` | 已实施 | MVP 编码实施记录：范围、偏离项、验证口径、踩坑记录 | **偏离项 5 条待评审**（doc.md §4）：GRDB 索引暂缓、SPM 可执行 target、GSFeatures 合一 target、每仓一 lane、diff 渲染简化 |
 | `specs/Story-1030-app-ui-alignment/` | 已实施（构建通过） | App 界面对齐原型：顶部 TitleBar、五视图 tab、命令面板、分支/合并/Stash/Tag/导入清单弹窗、变更集/聚合检索 | doc.md 设计 + summary.md；变更集（P1/P2）与聚合检索（P1）为超前占位待评审，命令面板为新立口径，待回写 TechStack §4.3 |
+| `specs/Story-1031-p0-batch1/` | 已实施（构建 + 47 测试全绿） | 批次 A 第一批（epic INDEX §6.1）：交互底座（菜单快捷键全注册/右键体系/⌘1-5）+ 看与改核心（并排 diff/行号词级高亮/Blame/文件历史/丢弃撤销/提交并推送/推送确认/合并收尾/外部合并工具/两者都保留/stash diff/tag 推送/ref 徽标/详情补全/在终端编辑器打开/分支一致性，17 项） | doc.md 设计（§5 简化项、§6 待评审项含 EP12 文档冲突）+ summary.md；DAG 图、多工作区/标签页/凭据、A3 非功能顺延下一批 |
 | `docs/epic/` | v1.0 · Draft（待评审） | 功能缺口与规划：对标 Fork / IDEA 的差距矩阵，12 个 Epic（109 个 Feature）的功能交互规格、批次与人周、MRD 回写建议 | 入口 `INDEX.md`；调研事实 `research-fork-idea.md`；不修改 MRD，新增项标「待评审」；进入开发时按 Feature ID 拆 Story |
 
 ## 二、代码模块（repos/GitSpace，SPM 多模块）
@@ -22,7 +23,7 @@
 
 | 模块 | 职责 | 状态 |
 |---|---|---|
-| `App/Sources/GitSpaceApp/` | 主 target：@main、顶部 TitleBar、三栏骨架、五视图（统一时间线/提交/多仓状态/变更集/聚合检索）、命令面板（⌘K）、分支/合并/Stash/Tag/导入清单弹窗、设置 | ✅ MVP + Story-1030 |
+| `App/Sources/GitSpaceApp/` | 主 target：@main、顶部 TitleBar、三栏骨架、五视图（统一时间线/提交/多仓状态/变更集/聚合检索）、命令面板（⌘K + 全量菜单快捷键）、分支/合并/Stash/Tag/导入清单/推送确认弹窗、DiffFileView（统一/并排/行号/词级高亮）、Blame/文件历史/两者都保留弹窗、外部工具启动器、设置 | ✅ MVP + Story-1030 + Story-1031 |
 | `Packages/GSDesignKit/` | 设计令牌（取色基准=原型深浅主题）、色板、mono 字体、图列常量 | ✅ MVP |
 | `Packages/GSGitEngine/` | git CLI 进程执行器（60s 超时/取消/网络重试/安全闸）、porcelain v2·log·for-each-ref·unified diff 解析、单仓 actor 门面、hunk 暂存管线 | ✅ MVP |
 | `Packages/GSIndex/` | 父目录扫描器、工作区配置 JSON 存储、跨仓时间线聚合、CardAggregator 卡片号跨仓聚合 | ✅ MVP（SQLite/FTS5 索引层按偏离项暂缓） |

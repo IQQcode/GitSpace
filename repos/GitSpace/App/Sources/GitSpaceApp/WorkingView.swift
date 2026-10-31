@@ -87,10 +87,11 @@ struct WorkingView: View {
     private func openInEditor(_ relativePath: String, line: Int?) {
         guard let repo = app.selectedRepo else { return }
         let url = repo.config.fileURL(relativePath)
+        let repoRoot = URL(fileURLWithPath: repo.config.expandedPath)
         do {
             try ExternalToolsLauncher.openInEditor(
                 ExternalEditor(rawValue: externalEditor) ?? .xcode,
-                repoPath: url.deletingLastPathComponent().deletingLastPathComponent(),
+                repoPath: repoRoot,
                 file: url,
                 line: line,
                 customTemplate: externalEditorCustom
