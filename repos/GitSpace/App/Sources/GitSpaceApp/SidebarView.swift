@@ -7,8 +7,6 @@ import GSDesignKit
 struct SidebarView: View {
     @Environment(AppModel.self) private var app
     @Binding var tab: RootView.MainTab
-    @Binding var showAddRepo: Bool
-    @Binding var showScan: Bool
     @State private var query = ""
     @State private var repoToRemove: ManagedRepo?
 
@@ -45,7 +43,7 @@ struct SidebarView: View {
     }
 
     private var workspaceCard: some View {
-        VStack(alignment: .leading, spacing: GSSpacing.s) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(app.workspace?.name ?? "GitSpace")
                     .font(.headline)
@@ -57,6 +55,9 @@ struct SidebarView: View {
                     .padding(.vertical, 2)
                     .background(Color.gs(.accent).opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
             }
+            if !workspaceSubtitle.isEmpty {
+                Text(workspaceSubtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
             HStack(spacing: GSSpacing.s) {
                 Label("\(app.repoCount) 个仓库", systemImage: "shippingbox")
                 if let version = app.gitVersionText.split(separator: ".").first {
@@ -65,6 +66,10 @@ struct SidebarView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            Text(freshnessText).font(.caption2).foregroundStyle(.tertiary)
+            if app.isRefreshing {
+                ProgressView().progressViewStyle(.linear).frame(height: 2)
+            }
         }
         .padding(GSSpacing.m)
         .background(Color.gs(.accent).opacity(0.06))
@@ -72,12 +77,23 @@ struct SidebarView: View {
         .padding(.top, GSSpacing.s)
     }
 
+    private var workspaceSubtitle: String {
+        let names = app.repos.prefix(2).map(\.displayName)
+        guard !names.isEmpty else { return "" }
+        return names.joined(separator: " + ") + (app.repoCount > 2 ? " 等" : "")
+    }
+
+    private var freshnessText: String {
+        guard let refreshed = app.lastRefreshed else { return "尚未刷新" }
+        return "数据截至 " + refreshed.formatted(date: .omitted, time: .shortened)
+    }
+
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.tertiary)
                 .font(.caption)
-            TextField("筛选仓库或分支（⌘K）", text: $query)
+            TextField("筛选仓库或分支", text: $query)
                 .textFieldStyle(.plain)
                 .font(.callout)
             if !query.isEmpty {
@@ -140,44 +156,40 @@ struct SidebarView: View {
     private var footer: some View {
         VStack(spacing: 2) {
             Divider()
-            Button {
-                showAddRepo = true
-            } label: {
-                Label {
-                    HStack {
-                        Text("添加仓库")
-                        Spacer()
-                        Text("⌘O").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                } icon: {
-                    Image(systemName: "plus.square")
-                }
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("o", modifiers: .command)
-            .padding(.horizontal, GSSpacing.s)
-            .padding(.vertical, 6)
-
-            Button {
-                showScan = true
-            } label: {
-                Label {
-                    HStack {
-                        Text("扫描父目录")
-                        Spacer()
-                        Text("⌘⇧O").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                } icon: {
-                    Image(systemName: "square.stack.3d.up")
-                }
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("o", modifiers: [.command, .shift])
-            .padding(.horizontal, GSSpacing.s)
-            .padding(.vertical, 6)
-            .padding(.bottom, GSSpacing.s)
+            sideAction("添加仓库", key: "⌘O", icon: "plus.square") { app.activeSheet = .addRepo }
+            sideAction("扫描父目录", key: "⌘⇧O", icon: "square.stack.3d.up") { app.activeSheet = .scan }
+            sideAction("导入 mgit 清单", key: nil, icon: "doc.text") { app.activeSheet = .importManifest }
+            Divider().padding(.vertical, 2)
+            sideAction("Stash 暂存", key: "⌘⇧S", icon: "archivebox") { openRepoSheet(.stash) }
+            sideAction("Tag 管理", key: "⌘⇧T", icon: "tag") { openRepoSheet(.tag) }
         }
         .font(.callout)
+        .padding(.bottom, GSSpacing.s)
+    }
+
+    private func sideAction(_ title: String, key: String?, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    if let key { Text(key).font(.caption2).foregroundStyle(.tertiary) }
+                }
+            } icon: {
+                Image(systemName: icon)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, GSSpacing.s)
+        .padding(.vertical, 6)
+    }
+
+    private func openRepoSheet(_ sheet: AppSheet) {
+        guard app.selectedRepo != nil else {
+            app.toasts.show("请先在左侧选择一个仓库", isError: true)
+            return
+        }
+        app.activeSheet = sheet
     }
 }
 

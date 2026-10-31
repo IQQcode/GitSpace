@@ -9,8 +9,11 @@ GitSpace Workspace 的知识入口。Agent 接需求后从这里路由到对应�
 | 产品需求 | `prd/` | [MRD（文件 v2.0，文档头 v1.5）](./prd/GitSpace-MRD-v2.0.md)：定位、P0 范围、验收、里程碑 | PM |
 | 技术方案 | `feature/` | [技术选型 v1.0](./feature/GitSpace-TechStack-v1.0.md)（Draft 待评审）；P0 PRD 待产出，以 MRD §10 P0 为范围基线 | PM / RD |
 | 交互设计 | `../design/` | [gitspace-prototype](../design/gitspace-prototype/)（原型 `index-origin.html` + 说明）；设计规范待沉淀 | 设计 |
-| 调研内容 | （暂无独立文档） | Fork / IDEA / 竞品分析目前都在 MRD 第 6、7、8 章；独立调研沉淀时建 `research/` | 调研人 |
+| 调研内容 | `epic/` | [Fork 与 IDEA 的 Git 能力调研](./epic/research-fork-idea.md)（2026-10，官方一手来源）；竞品总览仍在 MRD 第 6、7、8 章 | 调研人 |
+| 功能全景 | `func/` | [GitSpace 功能与交互 v1.0](./func/GitSpace-Features-v1.0.md)：当前已落地的功能与交互清单 | Agent / RD |
+| 功能缺口与规划 | `epic/` | [Epic 总览](./epic/INDEX.md)：差距矩阵、12 个 Epic 的功能交互规格、批次与人周、MRD 回写建议（Draft 待评审） | PM / RD |
 | 需求实现拆解 | `story/` | [story/](./story/) 目录（暂空，首个 Story 开始拆卡后落位） | Agent / RD |
+| 技术规格 | `../specs/` | [specs 索引](../specs/INDEX.md)：各 Story 的 doc / tasks / summary | Agent / RD |
 | 环境配置与联调 | （待建 `env/`） | Swift 工程初始化后落 `env/dev.md` | RD |
 | 仓库结构与导航 | [repo-structure.md](./repo-structure.md) | 完整目录树、目录职责、文档导航 | 团队共同维护 |
 
@@ -20,7 +23,10 @@ GitSpace Workspace 的知识入口。Agent 接需求后从这里路由到对应�
 - 想知道「技术怎么选、模块怎么分」：`feature/GitSpace-TechStack-v1.0.md`（硬约束看 §2）
 - 想知道「界面长什么样、怎么交互」：`../design/gitspace-prototype/index-origin.html` + TechStack §4.3 映射表
 - 想知道「竞品为什么这么定」：MRD 第 6、7、8 章（IDEA 基底 / Fork 交互 / 竞品分析）
+- 想知道「当前 App 有哪些功能和交互」：`func/GitSpace-Features-v1.0.md`
+- 想知道「还缺哪些功能、交互怎么做、先做什么」：`epic/INDEX.md`（Fork / IDEA 对标事实见 `epic/research-fork-idea.md`）
 - 想知道「某次需求怎么拆的」：`story/`
+- 想知道「某次研发的设计与实施总结」：`../specs/INDEX.md`
 - 想知道「某个目录放什么、新文件落哪」：`repo-structure.md`
 - 想知道「资产与模块在哪」：根 `INDEX.md`
 - 想知道「Agent 在这里怎么工作」：根 `AGENTS.md`

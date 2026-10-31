@@ -2,7 +2,7 @@
 
 快速定位各资产与模块。**动文档或代码前先看本索引**；结构与职责的完整说明见 `docs/repo-structure.md`。
 
-最后更新：2026-10-29。MVP 已落地：Swift 工程初始化于 `repos/GitSpace`（构建 / 26 测试 / 冒烟通过），进入 M1 打磨阶段。
+最后更新：2026-10-31。MVP 已落地并完成 Story-1030 界面对齐原型（顶部 TitleBar / 五视图 tab / 命令面板 / 四类弹窗，构建通过）；工程在 `repos/GitSpace`。新增 `docs/epic/` 功能缺口与规划（待评审）。
 
 ## 一、文档资产
 
@@ -13,6 +13,8 @@
 | `design/gitspace-prototype/index-origin.html` | 已验证 | 交互原型：统一跨仓时间线、批量操作、变更集聚合、聚合检索、仓库纳管、主题切换 | 单文件 HTML+CSS+原生 JS，浏览器直接打开；数据为演示示例，不访问真实仓库 |
 | `specs/Story-1029-mvp-plan/` | 已确认（回溯归档） | MVP 方案事实源（spec-flow 格式）：doc.md 设计 + tasks.md 执行契约（W1–W14 全部 ✅ 含复核证据） | 14 个工作项全部完成；MRD 10.4 的 3/4/9/10/11/12/13 条已自动化 |
 | `specs/Story-1029-mvp-coding/` | 已实施 | MVP 编码实施记录：范围、偏离项、验证口径、踩坑记录 | **偏离项 5 条待评审**（doc.md §4）：GRDB 索引暂缓、SPM 可执行 target、GSFeatures 合一 target、每仓一 lane、diff 渲染简化 |
+| `specs/Story-1030-app-ui-alignment/` | 已实施（构建通过） | App 界面对齐原型：顶部 TitleBar、五视图 tab、命令面板、分支/合并/Stash/Tag/导入清单弹窗、变更集/聚合检索 | doc.md 设计 + summary.md；变更集（P1/P2）与聚合检索（P1）为超前占位待评审，命令面板为新立口径，待回写 TechStack §4.3 |
+| `docs/epic/` | v1.0 · Draft（待评审） | 功能缺口与规划：对标 Fork / IDEA 的差距矩阵，12 个 Epic（109 个 Feature）的功能交互规格、批次与人周、MRD 回写建议 | 入口 `INDEX.md`；调研事实 `research-fork-idea.md`；不修改 MRD，新增项标「待评审」；进入开发时按 Feature ID 拆 Story |
 
 ## 二、代码模块（repos/GitSpace，SPM 多模块）
 
@@ -20,10 +22,10 @@
 
 | 模块 | 职责 | 状态 |
 |---|---|---|
-| `App/Sources/GitSpaceApp/` | 主 target：@main、三栏骨架、四视图（时间线/多仓状态/改动提交/分支合并）、弹窗与设置 | ✅ MVP |
+| `App/Sources/GitSpaceApp/` | 主 target：@main、顶部 TitleBar、三栏骨架、五视图（统一时间线/提交/多仓状态/变更集/聚合检索）、命令面板（⌘K）、分支/合并/Stash/Tag/导入清单弹窗、设置 | ✅ MVP + Story-1030 |
 | `Packages/GSDesignKit/` | 设计令牌（取色基准=原型深浅主题）、色板、mono 字体、图列常量 | ✅ MVP |
 | `Packages/GSGitEngine/` | git CLI 进程执行器（60s 超时/取消/网络重试/安全闸）、porcelain v2·log·for-each-ref·unified diff 解析、单仓 actor 门面、hunk 暂存管线 | ✅ MVP |
-| `Packages/GSIndex/` | 父目录扫描器、工作区配置 JSON 存储、跨仓时间线聚合 | ✅ MVP（SQLite/FTS5 索引层按偏离项暂缓） |
+| `Packages/GSIndex/` | 父目录扫描器、工作区配置 JSON 存储、跨仓时间线聚合、CardAggregator 卡片号跨仓聚合 | ✅ MVP（SQLite/FTS5 索引层按偏离项暂缓） |
 | `Packages/GSFeatures/` | AppModel（纳管/状态/批量）、TimelineModel、RepoViewModel（改动/分支/合并/stash/tag）、BatchSyncModel | ✅ MVP（五子域合一 target，见偏离项） |
 | `Packages/GSInfra/` | 应用路径约定、JSONL 操作日志、AsyncSemaphore | ✅ MVP |
 | `Packages/GSTestSupport/` | GitShell（CLI 基准）+ FixtureRepo（多 hunk/冲突/钩子 fixture 生成器） | ✅ MVP |
@@ -40,6 +42,9 @@
 | MVP 实施记录与偏离项 | `specs/Story-1029-mvp-coding/doc.md` + `summary.md` |
 | 新文件 / 新目录落哪 | `docs/repo-structure.md` 目录职责表 |
 | 新 Story 的规格 | `specs/[Story-MMDD]-<slug>/`（doc.md + summary.md） |
+| 各 Story 规格索引 | `specs/INDEX.md` |
+| 当前功能与交互全景 | `docs/func/GitSpace-Features-v1.0.md` |
+| 功能缺口、优先级与排期 | `docs/epic/INDEX.md`（各 Epic 文档在同目录） |
 | 术语与命名 | MRD §17.4（全篇唯一口径） |
 
 ## 四、已知坑

@@ -130,7 +130,7 @@ private struct CommitListView: View {
     }
 }
 
-private struct CommitRow: View {
+struct CommitRow: View {
     let commit: TimelineCommit
 
     var body: some View {

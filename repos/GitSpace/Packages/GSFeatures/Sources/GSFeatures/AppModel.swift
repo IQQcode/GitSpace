@@ -49,6 +49,13 @@ public final class AppModel {
     /// 时间线加载窗口（天），设置页可调（MRD 10.6 超大仓策略）。
     public var timelineWindowDays: Int = 90
 
+    // MARK: UI 状态（命令面板 / 全局弹窗 / 多仓选中集）
+    public var isPaletteOpen = false
+    public var paletteQuery = ""
+    /// 多仓状态视图选中集，上移至此以便命令面板预选批量 Pull / Push。
+    public var selectedRepos: Set<String> = []
+    public var activeSheet: AppSheet?
+
     public init() {}
 
     public var selectedRepo: ManagedRepo? {
@@ -65,6 +72,8 @@ public final class AppModel {
     }
     public var attentionCount: Int { repos.filter(\.needsAttention).count }
     public var totalUnpushed: Int { repos.reduce(0) { $0 + max(0, $1.status?.ahead ?? 0) } }
+    public var anyMergeInProgress: Bool { repos.contains { $0.isMergeInProgress } }
+    public var mergingRepoID: String? { repos.first { $0.isMergeInProgress }?.id }
 
     // MARK: 生命周期
 
@@ -171,6 +180,12 @@ public final class AppModel {
     public func markFetched(_ repo: ManagedRepo) {
         repo.lastFetched = Date()
     }
+}
+
+/// 全局弹窗路由（命令面板与侧栏共用，驱动 .sheet(item:)）。
+public enum AppSheet: String, Identifiable, Sendable {
+    case addRepo, scan, batch, branch, merge, stash, tag, importManifest
+    public var id: String { rawValue }
 }
 
 // MARK: - 批量同步（MRD 10.2-B：逐仓 排队/执行/成功/跳过/失败 + 可取消 + 重试）

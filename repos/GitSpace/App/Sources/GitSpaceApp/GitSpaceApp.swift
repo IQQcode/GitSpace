@@ -15,6 +15,14 @@ struct GitSpaceApp: App {
                 .frame(minWidth: 1180, minHeight: 700)
         }
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandMenu("操作") {
+                Button("打开命令面板") { appModel.isPaletteOpen = true }
+                    .keyboardShortcut("k", modifiers: .command)
+                Button("切换深浅色主题") { cycleAppearance() }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
+        }
 
         Settings {
             SettingsView()
@@ -29,6 +37,14 @@ struct GitSpaceApp: App {
         case "dark": return .dark
         case "light": return .light
         default: return nil
+        }
+    }
+
+    private func cycleAppearance() {
+        switch appearance {
+        case "system": appearance = "light"
+        case "light": appearance = "dark"
+        default: appearance = "system"
         }
     }
 }

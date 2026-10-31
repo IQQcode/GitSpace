@@ -30,6 +30,9 @@ GitSpace/                           ← Workspace 根目录
 │   │   └── GitSpace-MRD-v2.0.md    ← 市场需求文档（文档头 v1.5）：P0 范围、验收、里程碑
 │   ├── feature/
 │   │   └── GitSpace-TechStack-v1.0.md ← 技术选型（Draft 待评审）
+│   ├── func/
+│   │   └── GitSpace-Features-v1.0.md  ← 当前已落地的功能与交互全景
+│   ├── epic/                       ← 功能缺口与规划：INDEX.md 总览 + EP01 至 EP12 + Fork/IDEA 调研
 │   ├── story/                      ← 已完成 Story 的落盘记录（暂空）
 │   └── research/  env/             ← 调研 / 环境配置（待沉淀时创建）
 │
@@ -70,6 +73,7 @@ GitSpace/                           ← Workspace 根目录
 ## 文档导航（给 Agent 与新成员）
 
 - 想知道「产品要做什么」：读 `docs/INDEX.md` → `docs/prd/GitSpace-MRD-v2.0.md`
+- 想知道「还缺什么、先做什么」：读 `docs/epic/INDEX.md`
 - 想知道「技术怎么选、边界在哪」：读 `docs/feature/GitSpace-TechStack-v1.0.md` §2 约束锚点
 - 想知道「界面怎么交互」：读 `design/gitspace-prototype/`（原型 + README）
 - 想知道「某个资产/模块在哪」：读根 `INDEX.md`

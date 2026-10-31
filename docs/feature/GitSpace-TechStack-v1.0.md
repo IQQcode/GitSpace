@@ -108,6 +108,11 @@ macOS 27(代号 Golden Gate, 2026 年秋)是 **Liquid Glass 的打磨版本**: �
 | 合并进行中 | 顶部常驻悬浮条(玻璃材质)+ 冲突文件列表置顶 | `@available(macOS 26, *)` 玻璃, 低版本用标准材质 |
 | 改动视图(暂存) | 两栏文件树 + DiffTextView + hunk 选择 | hunk 级操作见第 5.3 |
 | 多仓标签页 | `Window` + `openWindow` / 标签化窗口 | 对齐 Fork 的多仓标签习惯 |
+| 顶部标题栏（Story-1030） | `TitleBar`：品牌 + 工作区 pill + 快速操作 chip + 主题按钮 + 设置 | 横跨顶部，系统红绿灯保留；单工作区时 pill 下拉禁用 |
+| 命令面板 ⌘K（Story-1030） | `CommandPaletteView` overlay + `PaletteCommand` 数组 | MRD 未定义，本次新立口径；快捷键在 App `.commands` 注册，面板项仅展示 |
+| 变更集视图（Story-1030，P1/P2 占位） | `ChangesetView` + `GSIndex.CardAggregator` 卡片号聚合 | 超前占位待评审；分组缓存自 `timelineModel.commits` |
+| 聚合检索视图（Story-1030，P1 占位） | `SearchView` 统一关键字匹配 + 按仓分组 | 超前占位待评审；生成 CR 清单到剪贴板 |
+| 分支/合并/Stash/Tag 弹窗（Story-1030） | `RepoSheets.swift` 四个 Sheet，复用 `RepoViewModel` | 由命令面板与侧栏唤起，替代原独立「分支·合并」tab |
 
 ---
 
@@ -334,3 +339,4 @@ M0 结论回填本文档, 状态由 Draft 转 Ready。
 ## 变更记录
 
 - **v1.0(2026-10-29)**: 初稿。基于 MRD v2.0 的能力基线与 13 条验收标准制定; 核心决策: Swift 6.4 + Xcode 27, SwiftUI 主导 + AppKit 关键路径, macOS 27 Liquid Glass 分层适配, 系统 git CLI 为唯一执行引擎 + SQLite 索引, Swift Concurrency actor 模型, 全依赖 Apache 2.0 兼容。
+- **v1.1(2026-10-30, Story-1030)**: §4.3 界面映射新增 顶部标题栏 / 命令面板（⌘K）/ 变更集视图 / 聚合检索视图 / 分支合并等弹窗。原「分支·合并」独立 tab 退场，功能迁入命令面板与侧栏唤起的弹窗。P0 功能范围与 §10.4 验收口径不变; 变更集（P1/P2）与聚合检索（P1）做 P0 界面一级入口属超前占位，待评审。
