@@ -18,7 +18,7 @@ public enum DiffParser {
 
         func closeHunk() {
             if let header = hunkHeader {
-                hunks.append(DiffHunk(id: hunks.count, header: header, lines: hunkLines))
+                hunks.append(DiffHunk(id: hunks.count, header: header, lines: assignLineNumbers(header, to: hunkLines)))
             }
             hunkHeader = nil
             hunkLines = []
@@ -105,5 +105,43 @@ public enum DiffParser {
         old = old.replacingOccurrences(of: "\"", with: "")
         new = new.replacingOccurrences(of: "\"", with: "")
         return (old, new)
+    }
+
+    // MARK: 行号（EP03-F02）
+
+    /// "@@ -12,3 +14,5 @@" → (12, 14)；解析失败返回 nil（不猜行号）。
+    static func parseHunkHeader(_ header: String) -> (oldStart: Int, newStart: Int)? {
+        guard let minus = header.firstIndex(of: "-"),
+              let plus = header[minus...].firstIndex(of: "+") else { return nil }
+        func digits(after index: String.Index, in text: String) -> Int? {
+            let start = text.index(after: index)
+            let run = text[start...].prefix(while: \.isNumber)
+            return run.isEmpty ? nil : Int(run)
+        }
+        guard let old = digits(after: minus, in: header),
+              let new = digits(after: plus, in: header) else { return nil }
+        return (old, new)
+    }
+
+    /// 按 hunk 头计数写出行号；meta 行（\ No newline）不消耗行号。
+    static func assignLineNumbers(_ header: String, to lines: [DiffLine]) -> [DiffLine] {
+        guard let (oldStart, newStart) = parseHunkHeader(header) else { return lines }
+        var result = lines
+        var oldNo = oldStart
+        var newNo = newStart
+        for i in result.indices {
+            switch result[i].origin {
+            case .context:
+                result[i].oldNumber = oldNo; oldNo += 1
+                result[i].newNumber = newNo; newNo += 1
+            case .del:
+                result[i].oldNumber = oldNo; oldNo += 1
+            case .add:
+                result[i].newNumber = newNo; newNo += 1
+            case .meta:
+                break
+            }
+        }
+        return result
     }
 }

@@ -29,6 +29,14 @@ extension GitRepository {
         try await runWrite(["apply", "--cached", "--reverse", "--whitespace=nowarn", "-"], action: "unstage.hunks", options: options)
     }
 
+    /// 块级丢弃（EP04-F01）：选中 hunk 反向应用到工作区（只动 worktree，不动 index）。
+    public func discardHunks(of file: FileDiff, hunkIDs: Set<Int>) async throws {
+        guard let patch = file.patch(selectingHunkIDs: hunkIDs) else { return }
+        var options = GitExecutionOptions(timeoutSeconds: 30)
+        options.stdin = patch
+        try await runWrite(["apply", "--reverse", "--whitespace=nowarn", "-"], action: "discard.hunks", options: options)
+    }
+
     public enum DiscardScope: Sendable, Equatable {
         /// 仅工作区改动（tracked）
         case worktree(path: String)
@@ -45,9 +53,30 @@ extension GitRepository {
         case .stagedAndWorktree(let path):
             try await runWrite(["restore", "--source=HEAD", "--staged", "--worktree", "--", path], action: "discard.all")
         case .untracked(let path):
-            try FileManager.default.removeItem(at: root.appendingPathComponent(path))
-            await operationLogger?.recordSuccess(repoName: name, action: "discard.untracked", durationMs: 0, detail: path)
+            // 未跟踪文件移入废纸篓而非直接删除（EP04-F01：可找回）
+            try FileManager.default.trashItem(
+                at: root.appendingPathComponent(path),
+                resultingItemURL: nil
+            )
+            await operationLogger?.recordSuccess(repoName: name, action: "discard.untracked.trash", durationMs: 0, detail: path)
         }
+    }
+
+    /// 丢弃前快照（EP04-F01）：`git stash create` 只创建提交对象，不改工作区与任何 ref。
+    /// 无可快照内容（干净区或纯未跟踪改动）时返回 nil。
+    @discardableResult
+    public func stashCreate(message: String?) async throws -> String? {
+        var arguments = ["stash", "create"]
+        if let message, !message.isEmpty { arguments += ["-m", message] }
+        let output = try await runWrite(arguments, action: "stash.createSnapshot")
+        let sha = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return sha.isEmpty ? nil : sha
+    }
+
+    /// 从丢弃快照恢复指定文件（EP04-F01 撤销丢弃）。
+    public func restoreFromSnapshot(sha: String, paths: [String]) async throws {
+        guard !paths.isEmpty else { return }
+        try await runWrite(["restore", "--source=\(sha)", "--worktree", "--"] + paths, action: "discard.undo")
     }
 
     /// 提交。钩子失败时抛 hookFailed 且原始输出完整带出（不吞错、不产生提交）。
@@ -94,8 +123,14 @@ extension GitRepository {
         try await runWrite(["push"], action: "push", options: .network)
     }
 
-    public func pushTag(name: String) async throws {
-        try await runWrite(["push", "origin", name], action: "tag.push", options: .network)
+    /// 推送 tag 到远端（EP07-F05）。
+    public func pushTag(name: String, remote: String = "origin") async throws {
+        try await runWrite(["push", remote, name], action: "tag.push", options: .network)
+    }
+
+    /// 删除远端 tag（EP07-F05）：`git push <remote> --delete <tag>`，非 force，UI 层二次确认。
+    public func deleteRemoteTag(name: String, remote: String = "origin") async throws {
+        try await runWrite(["push", remote, "--delete", name], action: "tag.deleteRemote", options: .network)
     }
 }
 
@@ -139,14 +174,29 @@ extension GitRepository {
             try await runWrite(["switch", "--track", remote.name], action: "branch.checkoutRemote")
         }
     }
+
+    /// 检出到指定提交（detached HEAD，EP02-F03）：脏区预检，UI 层二次确认。
+    public func checkoutDetached(sha: String) async throws {
+        let status = try await status()
+        if !status.isClean {
+            throw GitError.uncommittedChanges(message: "工作区有未提交改动，检出提交前请先 stash 或提交")
+        }
+        try await runWrite(["switch", "--detach", sha], action: "checkout.detached")
+    }
 }
 
 // MARK: - 合并与冲突（MRD 10.2-E）
 
 extension GitRepository {
+    /// 合并：message 非空时以 `-m` 传入（快进时 git 自然忽略，EP07-F01 可编辑合并信息）。
     @discardableResult
-    public func merge(ref: String, style: MergeStyle = .auto) async throws -> MergeOutcome {
-        var arguments = ["merge", "--no-edit"]
+    public func merge(ref: String, style: MergeStyle = .auto, message: String? = nil) async throws -> MergeOutcome {
+        var arguments = ["merge"]
+        if let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            arguments += ["-m", message]
+        } else {
+            arguments.append("--no-edit")
+        }
         switch style {
         case .fastForwardOnly: arguments.append("--ff-only")
         case .noFastForward: arguments.append("--no-ff")

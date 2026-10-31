@@ -91,8 +91,8 @@ enum CommitLogParser {
     static let fieldSeparator: Character = "\u{1f}"
     static let recordSeparator: Character = "\u{1e}"
 
-    /// H, h, an, ae, at, ct, P, D(decorations), s, b
-    public static let prettyFormat = "%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%ct%x1f%P%x1f%D%x1f%s%x1f%b%x1e"
+    /// H, h, an, ae, cn, ce, at, ct, P, D(decorations), s, b（EP02-F04 增加 committer 字段）
+    public static let prettyFormat = "%H%x1f%h%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%at%x1f%ct%x1f%P%x1f%D%x1f%s%x1f%b%x1e"
 
     static func parse(_ text: String) -> [CommitInfo] {
         var commits: [CommitInfo] = []
@@ -100,19 +100,21 @@ enum CommitLogParser {
             var body = record[...]
             if body.hasPrefix("\n") { body = body.dropFirst() }
             let fields = body.split(separator: fieldSeparator, omittingEmptySubsequences: false).map(String.init)
-            guard fields.count >= 10, !fields[0].isEmpty else { continue }
-            let parents = fields[6].split(separator: " ").map(String.init)
+            guard fields.count >= 12, !fields[0].isEmpty else { continue }
+            let parents = fields[8].split(separator: " ").map(String.init)
             commits.append(CommitInfo(
                 sha: fields[0],
                 shortSHA: fields[1].isEmpty ? String(fields[0].prefix(7)) : fields[1],
                 authorName: fields[2],
                 authorEmail: fields[3],
-                authorTimestamp: Int(fields[4]) ?? 0,
-                committerTimestamp: Int(fields[5]) ?? 0,
+                committerName: fields[4],
+                committerEmail: fields[5],
+                authorTimestamp: Int(fields[6]) ?? 0,
+                committerTimestamp: Int(fields[7]) ?? 0,
                 parents: parents,
-                decorations: parseDecorations(fields[7]),
-                subject: fields[8],
-                body: fields[9]
+                decorations: parseDecorations(fields[9]),
+                subject: fields[10],
+                body: fields[11]
             ))
         }
         return commits

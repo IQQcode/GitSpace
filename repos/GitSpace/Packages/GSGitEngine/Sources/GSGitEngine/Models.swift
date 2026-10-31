@@ -86,6 +86,8 @@ public struct CommitInfo: Sendable, Equatable, Identifiable {
     public let shortSHA: String
     public let authorName: String
     public let authorEmail: String
+    public let committerName: String
+    public let committerEmail: String
     public let authorTimestamp: Int
     public let committerTimestamp: Int
     public let parents: [String]
@@ -95,18 +97,26 @@ public struct CommitInfo: Sendable, Equatable, Identifiable {
     public var isMerge: Bool { parents.count > 1 }
 
     public init(sha: String, shortSHA: String, authorName: String, authorEmail: String,
+                committerName: String = "", committerEmail: String = "",
                 authorTimestamp: Int, committerTimestamp: Int, parents: [String],
                 decorations: [String], subject: String, body: String) {
         self.sha = sha
         self.shortSHA = shortSHA
         self.authorName = authorName
         self.authorEmail = authorEmail
+        self.committerName = committerName.isEmpty ? authorName : committerName
+        self.committerEmail = committerEmail.isEmpty ? authorEmail : committerEmail
         self.authorTimestamp = authorTimestamp
         self.committerTimestamp = committerTimestamp
         self.parents = parents
         self.decorations = decorations
         self.subject = subject
         self.body = body
+    }
+
+    /// author 与 committer 是否为同一人（EP02-F04：不同才显示 committer 行）。
+    public var hasDistinctCommitter: Bool {
+        committerName != authorName || committerEmail != authorEmail
     }
 
     /// 从装饰里取展示用分支/标签（HEAD -> x 优先）。
@@ -177,6 +187,10 @@ public struct DiffLine: Sendable, Equatable {
     public let raw: String
     public let origin: Origin
     public var text: String { raw.isEmpty ? "" : String(raw.dropFirst()) }
+    /// 旧行号（context / del 行有值，EP03-F02）。
+    public var oldNumber: Int?
+    /// 新行号（context / add 行有值）。
+    public var newNumber: Int?
 
     public init(raw: String) {
         self.raw = raw
@@ -265,4 +279,57 @@ public enum ConflictResolution: String, Sendable, CaseIterable {
     case ours       // 取当前
     case theirs     // 取对方
     case mergeMarkers // 生成合并标记，人工编辑后标记解决
+}
+
+// MARK: - Blame（EP03-F03）
+
+/// `git blame --porcelain` 输出里的单个提交元数据。
+public struct BlameCommitInfo: Sendable, Equatable {
+    public let sha: String
+    public let shortSHA: String
+    public let authorName: String
+    public let authorTimestamp: Int
+    public let summary: String
+    /// boundary 提交（历史窗口之外，git blame --boundary 或初始提交）。
+    public let isBoundary: Bool
+}
+
+/// 一行 blame 结果。
+public struct BlameLine: Sendable, Equatable {
+    public let lineNumber: Int
+    public let content: String
+    /// 归属提交 SHA。
+    public let sha: String
+    /// 该行是否是同一提交连续区段的首行。
+    public let isGroupStart: Bool
+}
+
+/// blame 结果：行列表 + 提交元数据表（按 SHA 索引）。
+public struct BlameResult: Sendable, Equatable {
+    public let lines: [BlameLine]
+    public let commits: [String: BlameCommitInfo]
+
+    public init(lines: [BlameLine], commits: [String: BlameCommitInfo]) {
+        self.lines = lines
+        self.commits = commits
+    }
+}
+
+// MARK: - 包含于（EP02-F04）
+
+/// 某提交被哪些分支 / tag 包含（`git for-each-ref --contains`）。
+public struct ContainsRefs: Sendable, Equatable {
+    public let localBranches: [String]
+    public let remoteBranches: [String]
+    public let tags: [String]
+
+    public init(localBranches: [String] = [], remoteBranches: [String] = [], tags: [String] = []) {
+        self.localBranches = localBranches
+        self.remoteBranches = remoteBranches
+        self.tags = tags
+    }
+
+    public var isEmpty: Bool {
+        localBranches.isEmpty && remoteBranches.isEmpty && tags.isEmpty
+    }
 }

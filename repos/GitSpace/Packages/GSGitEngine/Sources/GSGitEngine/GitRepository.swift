@@ -6,7 +6,8 @@ import GSInfra
 public actor GitRepository {
     public let root: URL
     public let name: String
-    private let runner: GitProcessRunner
+    /// 模块内扩展（History / Write）共用；不对外暴露。
+    let runner: GitProcessRunner
     /// 测试可注入 nil 关闭日志。
     public var operationLogger: OperationLog?
 
