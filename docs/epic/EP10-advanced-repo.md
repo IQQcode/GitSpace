@@ -4,10 +4,10 @@
 
 | 项 | 说明 |
 |---|---|
-| 优先级分布 | P2 3 项；P2 待评审 3 项 |
-| 人周（粗估） | 批次 C 8.5 |
+| 优先级分布 | P1（原 P2） 3 项；P1（待评审） 3 项 |
+| 人周（粗估） | P1 阶段（M4 后期） 8.5 |
 | 依赖 | EP01-F02 标签页（worktree / submodule 在新标签打开）；EP06-F01 侧栏分支树；EP04-F08 提交选项 |
-| 关联 | MRD 10.1「worktree / submodule：只读展示 → 管理，P2」、10.5「submodule 递归操作 P2」「LFS 大文件托管不做」、10.6 流程一「separate-git-dir 与 submodule 判定规则待定」 |
+| 关联 | MRD 10.1「worktree / submodule：只读展示 → 管理，P1（原 P2）」、10.5「submodule 递归操作 P1（原 P2）」「LFS 大文件托管不做」、10.6 流程一「separate-git-dir 与 submodule 判定规则待定」 |
 
 ## 1. 现状
 
@@ -21,14 +21,14 @@
 
 ## 3. Feature 清单
 
-| ID | Feature | 优先级 | 批次 | 人周 | 依据 |
+| ID | Feature | 优先级 | 排期 | 人周 | 依据 |
 |---|---|---|---|---|---|
-| EP10-F01 | Worktree 只读展示：识别 linked worktree，侧栏标出所属主仓与检出的分支 | P2 | C | 0.5 | MRD 10.1 |
-| EP10-F02 | Worktree 管理：新建（含把远端分支检出为 worktree）、移除（有未提交改动时阻止）、在新标签打开 | P2 | C | 1.5 | MRD 10.1、Fork 2.41 / 2.68 |
-| EP10-F03 | Submodule：显示状态（未初始化、提交偏移、有改动），init / update（默认非递归）、作为仓库打开、推送前提醒未推送的 submodule | P2 | C | 2 | MRD 10.1、10.5 |
-| EP10-F04 | Git LFS：识别 LFS 跟踪文件，diff 中显示指针或下载预览，查看 LFS 状态，锁定 / 解锁，大文件未纳入 LFS 时警告 | P2 待评审 | C | 2 | Fork |
-| EP10-F05 | git-flow：初始化，开始 / 结束 feature、release、hotfix | P2 待评审 | C | 1.5 | Fork 官网 |
-| EP10-F06 | 提交签名：按 `commit.gpgsign`、`gpg.format`、`user.signingkey` 签名提交（GPG 或 SSH）；提交详情显示签名状态 | P2 待评审 | C | 1 | IDEA、Fork |
+| EP10-F01 | Worktree 只读展示：识别 linked worktree，侧栏标出所属主仓与检出的分支 | P1（原 P2） | M4 后期 | 0.5 | MRD 10.1 |
+| EP10-F02 | Worktree 管理：新建（含把远端分支检出为 worktree）、移除（有未提交改动时阻止）、在新标签打开 | P1（原 P2） | M4 后期 | 1.5 | MRD 10.1、Fork 2.41 / 2.68 |
+| EP10-F03 | Submodule：显示状态（未初始化、提交偏移、有改动），init / update（默认非递归）、作为仓库打开、推送前提醒未推送的 submodule | P1（原 P2） | M4 后期 | 2 | MRD 10.1、10.5 |
+| EP10-F04 | Git LFS：识别 LFS 跟踪文件，diff 中显示指针或下载预览，查看 LFS 状态，锁定 / 解锁，大文件未纳入 LFS 时警告 | P1（待评审） | M4 后期 | 2 | Fork |
+| EP10-F05 | git-flow：初始化，开始 / 结束 feature、release、hotfix | P1（待评审） | M4 后期 | 1.5 | Fork 官网 |
+| EP10-F06 | 提交签名：按 `commit.gpgsign`、`gpg.format`、`user.signingkey` 签名提交（GPG 或 SSH）；提交详情显示签名状态 | P1（待评审） | M4 后期 | 1 | IDEA、Fork |
 
 ## 4. 交互规格
 
