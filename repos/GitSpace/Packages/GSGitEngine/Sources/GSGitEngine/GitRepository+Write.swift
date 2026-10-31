@@ -79,6 +79,11 @@ extension GitRepository {
         try await runWrite(["restore", "--source=\(sha)", "--worktree", "--"] + paths, action: "discard.undo")
     }
 
+    /// 取回旧版本文件到工作区（EP03-F04，等价 `git restore --source=<rev> --worktree`，UI 层二次确认）。
+    public func restoreFile(rev: String, path: String) async throws {
+        try await runWrite(["restore", "--source=\(rev)", "--worktree", "--", path], action: "file.restoreRevision")
+    }
+
     /// 提交。钩子失败时抛 hookFailed 且原始输出完整带出（不吞错、不产生提交）。
     @discardableResult
     public func commit(message: String, amend: Bool) async throws -> String {

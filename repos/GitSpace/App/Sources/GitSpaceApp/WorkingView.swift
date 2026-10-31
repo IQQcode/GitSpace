@@ -8,13 +8,13 @@ struct WorkingView: View {
     @Environment(AppModel.self) private var app
     @Bindable var vm: RepoViewModel
     @State private var hunkSelection = Set<Int>()
-    @State private var pendingDiscard: DiscardRequest?
+    @State private var pendingDiscard: PendingDiscard?
     @State private var isCommitting = false
 
-    struct DiscardRequest: Identifiable {
-        let path: String
-        let kind: RepoViewModel.DiscardKind
-        var id: String { path + kind.rawValue }
+    enum PendingDiscard {
+        case file(path: String, kind: RepoViewModel.DiscardKind)
+        case hunks(file: FileDiff, ids: Set<Int>)
+        case all
     }
 
     var body: some View {
@@ -29,20 +29,71 @@ struct WorkingView: View {
             commitBar
         }
         .confirmationDialog(
-            "丢弃 \"\(pendingDiscard?.path ?? "")\" 的改动？",
+            discardDialogTitle,
             isPresented: Binding(get: { pendingDiscard != nil }, set: { if !$0 { pendingDiscard = nil } }),
             titleVisibility: .visible
         ) {
-            Button("丢弃（不可撤销）", role: .destructive) {
+            Button("丢弃（可撤销）", role: .destructive) {
                 guard let request = pendingDiscard else { return }
-                Task {
-                    do { try await vm.discard(path: request.path, kind: request.kind) }
-                    catch { app.toasts.show(GitPresenter.text(for: error), isError: true) }
-                }
+                performDiscard(request)
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("该操作将把文件恢复到 HEAD 版本或删除未跟踪文件。")
+            Text(discardDialogMessage)
+        }
+    }
+
+    private var discardDialogTitle: String {
+        switch pendingDiscard {
+        case .file(let path, _): return "丢弃 \"\(path)\" 的改动？"
+        case .hunks(let file, let ids): return "丢弃 \"\(file.path)\" 的 \(ids.count) 个改动块？"
+        case .all: return "丢弃全部改动？"
+        case nil: return ""
+        }
+    }
+
+    private var discardDialogMessage: String {
+        switch pendingDiscard {
+        case .file(_, let kind) where kind == .untracked:
+            return "未跟踪文件将移入废纸篓。丢弃前会自动创建快照，可撤销。"
+        case .all:
+            return "将丢弃 \(vm.unstagedEntries.count) 个文件的改动与 \(vm.untrackedEntries.count) 个未跟踪文件。丢弃前会自动创建快照，可撤销。"
+        default:
+            return "丢弃前会自动创建快照，丢弃后可通过通知条撤销。"
+        }
+    }
+
+    // MARK: 丢弃（EP04-F01：快照 + 撤销）
+
+    private func performDiscard(_ pending: PendingDiscard) {
+        guard let repo = app.selectedRepo else { return }
+        Task {
+            do {
+                switch pending {
+                case .file(let path, let kind):
+                    let scope: GitRepository.DiscardScope
+                    switch kind {
+                    case .worktree: scope = .worktree(path: path)
+                    case .stagedAndWorktree: scope = .stagedAndWorktree(path: path)
+                    case .untracked: scope = .untracked(path: path)
+                    }
+                    try await app.discardUndo.discardFiles(repo: repo, scopes: [scope])
+                case .hunks(let file, let ids):
+                    try await app.discardUndo.discardHunks(repo: repo, file: file, hunkIDs: ids)
+                case .all:
+                    try await app.discardUndo.discardAll(repo: repo)
+                }
+                await vm.refresh()
+                app.toasts.showWithAction("已丢弃改动", actionLabel: "撤销") {
+                    Task {
+                        let message = await app.discardUndo.undo(repo: repo)
+                        app.toasts.show(message, isError: !message.hasPrefix("已恢复"))
+                        await vm.refresh()
+                    }
+                }
+            } catch {
+                app.toasts.show(GitPresenter.text(for: error), isError: true)
+            }
         }
     }
 
@@ -63,6 +114,15 @@ struct WorkingView: View {
                 Text("未提交 \(status.dirtyCount) · 未推送 \(max(0, status.ahead))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+            }
+            if vm.unstagedEntries.isEmpty && vm.untrackedEntries.isEmpty && vm.stagedEntries.isEmpty {
+                EmptyView()
+            } else {
+                Button("丢弃全部改动…", role: .destructive) {
+                    pendingDiscard = .all
+                }
+                .font(.caption)
+                .disabled(vm.unstagedEntries.isEmpty && vm.untrackedEntries.isEmpty)
             }
         }
         .padding(.horizontal, GSSpacing.m)
@@ -92,7 +152,7 @@ struct WorkingView: View {
                             ("暂存", "plus.square.on.square", { Task { try? await vm.stageFiles([entry.path]) } })
                         ],
                         trailingAction: ("丢弃", "arrow.uturn.backward", {
-                            pendingDiscard = DiscardRequest(
+                            pendingDiscard = PendingDiscard.file(
                                 path: entry.path,
                                 kind: (entry.indexKind != nil) ? .stagedAndWorktree : .worktree
                             )
@@ -112,7 +172,7 @@ struct WorkingView: View {
                             ("暂存", "plus.square.on.square", { Task { try? await vm.stageFiles([entry.path]) } })
                         ],
                         trailingAction: ("删除", "trash", {
-                            pendingDiscard = DiscardRequest(path: entry.path, kind: .untracked)
+                            pendingDiscard = PendingDiscard.file(path: entry.path, kind: .untracked)
                         })
                     ) {
                         vm.select(path: entry.path, side: .unstaged)
@@ -222,6 +282,12 @@ struct WorkingView: View {
                         }
                     }
                     .font(.caption)
+                    Button("丢弃选中块…") {
+                        let ids = hunkSelection.isEmpty ? Set(file.hunks.map(\.id)) : hunkSelection
+                        pendingDiscard = .hunks(file: file, ids: ids)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Color.gs(.red))
                 } else {
                     stageHunkButton(file: file, title: "取消暂存选中块") { ids in
                         try? await vm.unstageHunks(of: file, hunkIDs: ids)
@@ -269,7 +335,7 @@ struct WorkingView: View {
         .font(.caption)
     }
 
-    // MARK: 提交栏
+    // MARK: 提交栏（EP04-F02 信息辅助 + EP04-F03 提交并推送）
 
     private var commitBar: some View {
         VStack(spacing: GSSpacing.s) {
@@ -284,21 +350,7 @@ struct WorkingView: View {
                     Spacer()
                 }
             } else {
-                TextEditor(text: $vm.message)
-                    .font(.callout)
-                    .scrollContentBackground(.hidden)
-                    .frame(height: 56)
-                    .padding(6)
-                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(alignment: .topLeading) {
-                        if vm.message.isEmpty {
-                            Text("提交信息（支持多行；历史建议在 P1 接入）")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .padding(12)
-                                .allowsHitTesting(false)
-                        }
-                    }
+                commitMessageInput
                 Toggle("追加到上一次提交（amend）", isOn: $vm.amend)
                     .font(.caption)
             }
@@ -318,23 +370,24 @@ struct WorkingView: View {
                         Task { try? await vm.abortMerge() }
                     }
                 }
-                Button {
-                    Task {
-                        isCommitting = true
-                        defer { isCommitting = false }
-                        do {
-                            _ = try await vm.commit()
-                            app.toasts.show("提交成功")
-                        } catch {
-                            app.toasts.show(GitPresenter.text(for: error), isError: true)
-                        }
+                if !vm.isMergeInProgress {
+                    Button {
+                        commitAndPush()
+                    } label: {
+                        Label("提交并推送", systemImage: "arrow.up.circle")
                     }
+                    .keyboardShortcut("\r", modifiers: [.command, .option])
+                    .disabled(!vm.canCommit || vm.isBusy || isCommitting)
+                }
+                Button {
+                    commitOnly()
                 } label: {
                     Label(
                         vm.isMergeInProgress ? "完成合并提交" : (vm.amend ? "Amend 提交" : "提交"),
                         systemImage: "arrow.up.circle.fill"
                     )
                 }
+                .keyboardShortcut("\r", modifiers: .command)
                 .buttonStyle(.borderedProminent)
                 .tint(Color.gs(.accent))
                 .disabled(!vm.canCommit || vm.isBusy || isCommitting)
@@ -355,6 +408,102 @@ struct WorkingView: View {
         }
         .padding(GSSpacing.m)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 标题行：输入 + 长度计数 + 历史下拉（EP04-F02）。
+    private var commitMessageInput: some View {
+        VStack(alignment: .leading, spacing: GSSpacing.xs) {
+            HStack(spacing: GSSpacing.s) {
+                TextField("标题（第一行，可用卡片号前缀）", text: $vm.messageTitle)
+                    .textFieldStyle(.roundedBorder)
+                titleCounter
+                historyMenu
+            }
+            TextEditor(text: $vm.messageBody)
+                .font(.callout)
+                .scrollContentBackground(.hidden)
+                .frame(height: 48)
+                .padding(6)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(alignment: .topLeading) {
+                    if vm.messageBody.isEmpty {
+                        Text("正文（可选，第二行起）")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(12)
+                            .allowsHitTesting(false)
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var titleCounter: some View {
+        switch vm.titleLengthState {
+        case .normal(let count):
+            Text("\(count) / 50").font(.gsMonoSmall).foregroundStyle(.tertiary)
+        case .overRecommended(let count):
+            Text("\(count) / 50").font(.gsMonoSmall).foregroundStyle(Color.gs(.amber))
+                .help("标题超过 50 字符，建议精简")
+        case .overLimit(let count):
+            Label("\(count)", systemImage: "exclamationmark.triangle.fill")
+                .font(.gsMonoSmall)
+                .foregroundStyle(Color.gs(.red))
+                .help("标题超过 72 字符")
+        }
+    }
+
+    /// [v] 历史下拉：本仓最近 20 条提交标题；选中后整段替换。
+    private var historyMenu: some View {
+        Menu {
+            if vm.recentSubjects.isEmpty {
+                Text("暂无历史提交").font(.caption)
+            } else {
+                ForEach(Array(vm.recentSubjects.prefix(20).enumerated()), id: \.offset) { _, subject in
+                    Button(subject.lineLimitText) {
+                        vm.applyMessageText(subject)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("历史提交信息（最近 20 条）")
+    }
+
+    private func commitOnly() {
+        Task {
+            isCommitting = true
+            defer { isCommitting = false }
+            do {
+                _ = try await vm.commit()
+                app.toasts.show("提交成功")
+            } catch {
+                app.toasts.show(GitPresenter.text(for: error), isError: true)
+            }
+        }
+    }
+
+    /// 提交并推送（EP04-F03，⌥⌘↩）：提交成功后进入推送确认（EP05-F02）。
+    private func commitAndPush() {
+        Task {
+            isCommitting = true
+            defer { isCommitting = false }
+            do {
+                _ = try await vm.commit()
+                app.toasts.show("提交成功")
+                if let repo = app.selectedRepo {
+                    await app.openPushConfirmation(for: [repo])
+                }
+            } catch {
+                app.toasts.show(GitPresenter.text(for: error), isError: true)
+            }
+        }
     }
 }
 
@@ -418,5 +567,12 @@ struct ChangeRow: View {
         case "R": return Color.gs(.purple)
         default: return Color.gs(.amber)
         }
+    }
+}
+
+private extension String {
+    /// 历史下拉菜单项的截断展示。
+    var lineLimitText: String {
+        count > 64 ? prefix(64) + "…" : self
     }
 }

@@ -10,27 +10,44 @@ struct ToastsView: View {
     var body: some View {
         VStack(spacing: GSSpacing.xs) {
             ForEach(app.toasts.toasts) { toast in
-                HStack(spacing: 7) {
-                    Image(systemName: toast.isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(toast.isError ? Color.gs(.red) : Color.gs(.green))
-                    Text(toast.text)
-                        .font(.callout)
-                        .lineLimit(3)
-                }
-                .padding(.horizontal, GSSpacing.m)
-                .padding(.vertical, GSSpacing.s)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9)
-                        .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                ToastRow(toast: toast)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .padding(.bottom, 34)
-        .animation(.easeOut(duration: 0.2), value: app.toasts.toasts)
-        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.2), value: app.toasts.toasts.map(\.id))
+    }
+}
+
+private struct ToastRow: View {
+    @Environment(AppModel.self) private var app
+    let toast: ToastCenter.Toast
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: toast.isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(toast.isError ? Color.gs(.red) : Color.gs(.green))
+            Text(toast.text)
+                .font(.callout)
+                .lineLimit(3)
+            if let label = toast.actionLabel, let action = toast.action {
+                Button(label) {
+                    action()
+                    app.toasts.dismiss(id: toast.id)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(Color.gs(.accent))
+            }
+        }
+        .padding(.horizontal, GSSpacing.m)
+        .padding(.vertical, GSSpacing.s)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
     }
 }
 

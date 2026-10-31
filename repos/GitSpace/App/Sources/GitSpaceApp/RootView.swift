@@ -41,7 +41,12 @@ struct RootView: View {
         .sheet(item: $app.activeSheet) { sheet in sheetView(sheet) }
         .overlay { paletteOverlay }
         .overlay(alignment: .bottomTrailing) { ToastsView() }
-        .task { await initialLoad() }
+        .task {
+            // 提交草稿存取（EP04-F02：会话级，跨仓库切换保留）
+            repoVM.draftProvider = { app.commitDrafts[$0] }
+            repoVM.draftStore = { app.commitDrafts[$0] = $1 }
+            await initialLoad()
+        }
         .onChange(of: app.selectedRepoPath) {
             Task { await repoVM.bind(to: app.selectedRepo) }
         }
@@ -59,7 +64,12 @@ struct RootView: View {
                     EmptyStateView(title: "未选择仓库", hint: "在左侧选择一个仓库后开始提交")
                 }
             case .status:
-                StatusView(onRunBatch: runBatch)
+                StatusView(
+                    onRunBatch: runBatch,
+                    onPushConfirm: { targets in
+                        Task { await app.openPushConfirmation(for: targets) }
+                    }
+                )
             case .changeset:
                 ChangesetView(timeline: timelineModel, onOpenTimeline: { card in
                     timelineModel.filters.text = card
@@ -148,6 +158,7 @@ struct RootView: View {
         case .stash: StashSheet(vm: repoVM)
         case .tag: TagSheet(vm: repoVM)
         case .importManifest: ImportManifestSheet()
+        case .pushConfirm: PushConfirmSheet()
         }
     }
 
@@ -169,7 +180,8 @@ struct RootView: View {
             },
             PaletteCommand(label: "批量 Push（选中未推送仓库）", shortcut: nil) {
                 let targets = app.repos.filter { ($0.status?.ahead ?? 0) > 0 }
-                app.selectedRepos = Set(targets.map(\.id)); tab = .status; runBatch(.push, repos: targets)
+                app.selectedRepos = Set(targets.map(\.id)); tab = .status
+                Task { await app.openPushConfirmation(for: targets) }
             },
             PaletteCommand(label: "新建 / 管理分支", shortcut: "⌘⇧B") { openRepoSheet(.branch) },
             PaletteCommand(label: "合并分支", shortcut: "⌘⇧M") { openRepoSheet(.merge) },

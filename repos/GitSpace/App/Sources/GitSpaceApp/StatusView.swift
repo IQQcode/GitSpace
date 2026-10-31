@@ -6,6 +6,8 @@ import GSDesignKit
 struct StatusView: View {
     @Environment(AppModel.self) private var app
     let onRunBatch: (BatchAction, [ManagedRepo]) -> Void
+    /// Push 走推送确认（EP05-F02）而非直接执行。
+    let onPushConfirm: ([ManagedRepo]) -> Void
     @State private var selection = Set<String>()
     @State private var expanded = true
 
@@ -133,7 +135,7 @@ struct StatusView: View {
             Spacer()
             Button("批量 Fetch") { onRunBatch(.fetch, selectedRepos) }
             Button("批量 Pull") { onRunBatch(.pull, selectedRepos) }
-            Button("批量 Push") { onRunBatch(.push, selectedRepos) }
+            Button("批量 Push") { onPushConfirm(selectedRepos) }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.gs(.accent))
         }

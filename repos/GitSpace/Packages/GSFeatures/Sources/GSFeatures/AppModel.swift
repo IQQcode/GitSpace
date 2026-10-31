@@ -55,6 +55,12 @@ public final class AppModel {
     /// 多仓状态视图选中集，上移至此以便命令面板预选批量 Pull / Push。
     public var selectedRepos: Set<String> = []
     public var activeSheet: AppSheet?
+    /// 推送确认面板的预检结果（EP05-F02）。
+    public private(set) var pushPreview: [PushPreviewItem] = []
+    /// 各仓未成功提交的草稿（EP04-F02：钩子失败等场景保留到下次打开，会话级）。
+    public var commitDrafts: [String: String] = [:]
+    /// 丢弃撤销中心（EP04-F01）。
+    public let discardUndo = DiscardUndoCenter()
 
     public init() {}
 
@@ -180,12 +186,87 @@ public final class AppModel {
     public func markFetched(_ repo: ManagedRepo) {
         repo.lastFetched = Date()
     }
+
+    // MARK: 推送确认（EP05-F02：先预检 → 确认 → 执行）
+
+    /// 只读预检：逐仓刷新 status 后整理预览项，然后打开确认面板。
+    public func openPushConfirmation(for repos: [ManagedRepo]) async {
+        guard !repos.isEmpty else { return }
+        var items: [PushPreviewItem] = []
+        for repo in repos {
+            await refresh(repo)
+            if let status = repo.status {
+                let reason: String?
+                if status.upstream == nil {
+                    reason = "无上游分支"
+                } else if status.ahead == 0 {
+                    reason = "无待推送提交"
+                } else {
+                    reason = nil
+                }
+                items.append(PushPreviewItem(
+                    repoID: repo.id,
+                    repoName: repo.displayName,
+                    branch: status.branch,
+                    upstream: status.upstream,
+                    ahead: status.ahead,
+                    skipReason: reason
+                ))
+            } else {
+                items.append(PushPreviewItem(
+                    repoID: repo.id,
+                    repoName: repo.displayName,
+                    branch: nil, upstream: nil, ahead: 0,
+                    skipReason: repo.errorText ?? "读取失败"
+                ))
+            }
+        }
+        pushPreview = items
+        activeSheet = .pushConfirm
+    }
+
+    /// 确认面板点「推送」后执行（复用批量同步的排队/并发/逐仓结果）。
+    public func confirmPush() {
+        let targets = repos.filter { repo in
+            pushPreview.contains { $0.repoID == repo.id && $0.isPushable }
+        }
+        activeSheet = nil
+        guard !targets.isEmpty else { return }
+        batch.start(action: .push, repos: targets)
+        activeSheet = .batch
+    }
 }
 
 /// 全局弹窗路由（命令面板与侧栏共用，驱动 .sheet(item:)）。
 public enum AppSheet: String, Identifiable, Sendable {
     case addRepo, scan, batch, branch, merge, stash, tag, importManifest
+    case pushConfirm
     public var id: String { rawValue }
+}
+
+// MARK: - 推送前确认（EP05-F02）
+
+/// 推送预检项：数据只来自只读 status（porcelain v2 branch.ab），不自算。
+public struct PushPreviewItem: Identifiable, Sendable {
+    public let repoID: String
+    public let repoName: String
+    public let branch: String?
+    public let upstream: String?
+    public let ahead: Int
+    /// nil = 将执行；否则为跳过原因（无上游分支 / 无待推送提交 / 读取失败）。
+    public let skipReason: String?
+
+    public var id: String { repoID }
+    public var isPushable: Bool { skipReason == nil }
+
+    public init(repoID: String, repoName: String, branch: String?, upstream: String?, ahead: Int, skipReason: String?) {
+        self.repoID = repoID
+        self.repoName = repoName
+        self.branch = branch
+        self.upstream = upstream
+        self.ahead = ahead
+        self.skipReason = skipReason
+    }
 }
 
 // MARK: - 批量同步（MRD 10.2-B：逐仓 排队/执行/成功/跳过/失败 + 可取消 + 重试）
@@ -339,21 +420,44 @@ public final class BatchSyncModel {
 @MainActor
 @Observable
 public final class ToastCenter {
-    public struct Toast: Identifiable, Equatable {
+    public struct Toast: Identifiable {
         public let id = UUID()
         public let text: String
         public let isError: Bool
+        /// 可选动作（如丢弃撤销的「撤销」、合并完成的「推送」）。
+        public let actionLabel: String?
+        public let action: (() -> Void)?
+
+        public init(text: String, isError: Bool = false, actionLabel: String? = nil, action: (() -> Void)? = nil) {
+            self.text = text
+            self.isError = isError
+            self.actionLabel = actionLabel
+            self.action = action
+        }
     }
 
     public private(set) var toasts: [Toast] = []
 
     public func show(_ text: String, isError: Bool = false) {
-        let toast = Toast(text: text, isError: isError)
+        show(Toast(text: text, isError: isError))
+    }
+
+    public func show(_ toast: Toast) {
         toasts.append(toast)
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(2.8))
             self?.toasts.removeAll { $0.id == toast.id }
         }
+    }
+
+    /// 带动作的提示（如 [撤销]）；动作触发后立即移除该条。
+    public func showWithAction(_ text: String, actionLabel: String, action: @escaping () -> Void) {
+        show(Toast(text: text, actionLabel: actionLabel, action: action))
+    }
+
+    /// 立即移除一条提示（动作按钮点击后调用）。
+    public func dismiss(id: UUID) {
+        toasts.removeAll { $0.id == id }
     }
 }
 

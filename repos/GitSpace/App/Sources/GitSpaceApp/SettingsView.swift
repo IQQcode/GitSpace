@@ -6,6 +6,8 @@ import GSInfra
 struct SettingsView: View {
     @Environment(AppModel.self) private var app
     @AppStorage("appearance") private var appearance = "system"
+    @AppStorage("mergeTool") private var mergeTool = "filemerge"
+    @AppStorage("mergeToolCustomTemplate") private var mergeToolCustomTemplate = ""
 
     var body: some View {
         @Bindable var app = app
@@ -39,6 +41,30 @@ struct SettingsView: View {
                     Text("浅色").tag("light")
                     Text("深色").tag("dark")
                 }
+            }
+
+            Section("合并工具（EP07-F02）") {
+                Picker("工具", selection: $mergeTool) {
+                    ForEach(ExternalMergeTool.allCases) { tool in
+                        Text(tool.displayName).tag(tool.rawValue)
+                    }
+                }
+                if mergeTool == ExternalMergeTool.custom.rawValue {
+                    TextField("命令模板（$LOCAL $REMOTE $BASE $MERGED）", text: $mergeToolCustomTemplate)
+                        .textFieldStyle(.roundedBorder)
+                    Text("示例：meld $LOCAL $REMOTE $BASE --output $MERGED。路径以独立参数传入，不经过 shell。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    let template = ExternalMergeTool(rawValue: mergeTool)?.template ?? ""
+                    Text("命令：\(template)")
+                        .font(.gsMonoSmall)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                Text("工具退出后 GitSpace 会检查冲突标记；只有你确认后才执行 git add。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("环境") {
