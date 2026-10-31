@@ -182,6 +182,8 @@ struct SidebarView: View {
             sideAction("扫描父目录", key: "⌘⇧O", icon: "square.stack.3d.up") { app.activeSheet = .scan }
             sideAction("导入 mgit 清单", key: nil, icon: "doc.text") { app.activeSheet = .importManifest }
             Divider().padding(.vertical, 2)
+            sideAction("分支管理", key: "⌘⇧B", icon: "arrow.triangle.branch") { openRepoSheet(.branch) }
+            sideAction("合并分支", key: "⌘⇧M", icon: "arrow.triangle.merge") { openRepoSheet(.merge) }
             sideAction("Stash 暂存", key: "⌘⇧S", icon: "archivebox") { openRepoSheet(.stash) }
             sideAction("Tag 管理", key: "⌘⇧T", icon: "tag") { openRepoSheet(.tag) }
         }
@@ -278,10 +280,7 @@ struct RepoRow: View {
                         Spacer(minLength: 0)
                         FlagChips(status: repo.status, errorText: repo.errorText)
                     }
-                    Text(repo.branchName ?? (repo.errorText != nil ? "读取失败" : "…"))
-                        .font(.gsMonoSmall)
-                        .foregroundStyle(repo.errorText != nil ? Color.gs(.red) : .secondary)
-                        .lineLimit(1)
+                    BranchQuickSwitchLabel(repo: repo)
                 }
             }
             .padding(.horizontal, GSSpacing.s)

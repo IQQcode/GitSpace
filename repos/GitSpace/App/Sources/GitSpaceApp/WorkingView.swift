@@ -141,8 +141,8 @@ struct WorkingView: View {
         HStack(spacing: GSSpacing.s) {
             Circle().fill(GSPalette.color(forSlot: app.selectedRepo?.colorSlot ?? 0)).frame(width: 8, height: 8)
             Text(app.selectedRepo?.displayName ?? "—").font(.headline)
-            if let branch = vm.currentBranch {
-                Text(branch).font(.gsMonoSmall).foregroundStyle(Color.gs(.accent))
+            if let selectedRepo = app.selectedRepo {
+                BranchQuickSwitchLabel(repo: selectedRepo, showsChevron: !vm.isDetached)
             }
             if vm.isDetached {
                 Text("detached HEAD").font(.caption).foregroundStyle(Color.gs(.amber))
