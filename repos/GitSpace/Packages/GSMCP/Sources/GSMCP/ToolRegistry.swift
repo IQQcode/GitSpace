@@ -72,7 +72,7 @@ enum MCPToolSchema {
 enum ToolRegistry {
     static let definitions: [MCPToolDef] = [
         // MARK: 清单与状态
-        MCPToolDef(name: "list_repos", description: "列出 GitSpace 已纳管的仓库（名称与绝对路径）。非纳管仓库也可直接把绝对路径传给其他工具的 repo 参数。", ["repo": MCPToolSchema.str("（不使用，占位保证 schema 为 object）")], required: []),
+        MCPToolDef(name: "list_repos", description: "列出 GitSpace 已纳管的仓库（名称与绝对路径）。非纳管仓库也可直接把绝对路径传给其他工具的 repo 参数。", [:], required: []),
         MCPToolDef(name: "git_status", description: "查看仓库状态：分支、相对上游、暂存/未暂存/未跟踪/冲突文件清单。", ["repo": repoParam], required: ["repo"]),
         MCPToolDef(name: "git_current_sha", description: "当前 HEAD 的完整 SHA。", ["repo": repoParam], required: ["repo"]),
         MCPToolDef(name: "git_has_remote", description: "仓库是否配置了远端。", ["repo": repoParam], required: ["repo"]),

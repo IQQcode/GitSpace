@@ -1,7 +1,42 @@
 import SwiftUI
 import GSFeatures
+import GSMCP
+import GSInfra
 
+/// 进程入口（Story-1031-mcp）：
+/// - `GitSpaceApp mcp-serve` → 以 stdio 运行 MCP server（GUI 不启动，stdout 为协议通道）；
+/// - 其余 → 正常 GUI 启动，并后台安装/更新 git-spece skill。
 @main
+struct MainEntry {
+    static func main() async {
+        if CommandLine.arguments.contains("mcp-serve") {
+            let server = MCPServer()
+            do {
+                try await server.run()
+            } catch {
+                FileHandle.standardError.write(Data("GitSpace MCP server 异常退出：\(error)\n".utf8))
+                exit(1)
+            }
+            return
+        }
+
+        // GUI 模式：后台安装/更新 git-spece skill 到 ~/.agents/skills（失败不打断启动）。
+        Task.detached(priority: .utility) {
+            Self.installSkillIfNeeded()
+        }
+        await GitSpaceApp.main()
+    }
+
+    private static func installSkillIfNeeded() {
+        guard let source = MCPSkillInstaller.bundleSkillDirectory() else { return }
+        _ = try? MCPSkillInstaller.installIfNeeded(
+            sourceDirectory: source,
+            targetDirectory: MCPSkillInstaller.defaultTargetDirectory,
+            manifestFile: GSPaths.skillInstallManifest
+        )
+    }
+}
+
 struct GitSpaceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appModel = AppModel()
@@ -66,7 +101,6 @@ struct GitSpaceApp: App {
                 .frame(width: 460)
         }
     }
-
     private var colorScheme: ColorScheme? {
         switch appearance {
         case "dark": return .dark

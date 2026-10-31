@@ -104,6 +104,8 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            MCPSettingsSection()
         }
         .formStyle(.grouped)
     }

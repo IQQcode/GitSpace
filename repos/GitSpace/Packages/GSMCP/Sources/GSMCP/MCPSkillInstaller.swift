@@ -56,9 +56,13 @@ public enum MCPSkillInstaller {
         guard let enumerator = fs.enumerator(at: sourceDirectory, includingPropertiesForKeys: [.isRegularFileKey]) else {
             throw InstallError.sourceMissing(sourceDirectory.path)
         }
+        // /var 与 /private/var 等符号链接会让 path 前缀不一致，先统一解析。
+        let sourcePath = sourceDirectory.resolvingSymlinksInPath().path
         for case let fileURL as URL in enumerator {
             guard let isRegular = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile, isRegular else { continue }
-            let relative = fileURL.path.replacingOccurrences(of: sourceDirectory.path + "/", with: "")
+            let resolved = fileURL.resolvingSymlinksInPath().path
+            guard resolved.hasPrefix(sourcePath + "/") else { continue }
+            let relative = String(resolved.dropFirst(sourcePath.count + 1))
             let destination = targetDirectory.appendingPathComponent(relative)
             try fs.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? fs.removeItem(at: destination)

@@ -3,11 +3,6 @@ import GSInfra
 import GSGitEngine
 import GSIndex
 
-/// 应用配置（GUI 与 MCP server 共读）：config.json。
-struct MCPAppConfig: Codable, Sendable {
-    var mcpWritesEnabled: Bool = true
-}
-
 /// MCP stdio server（Story-1031-mcp）：
 /// - 传输：换行分隔 JSON-RPC 2.0（MCP stdio 规范），串行处理；
 /// - 方法面：initialize / notifications/initialized / ping / tools/list / tools/call；
@@ -111,7 +106,7 @@ public actor MCPServer {
         let arguments = params?["arguments"] ?? .object([:])
 
         if tool.isWrite {
-            let writesEnabled = (try? Self.readConfig(from: configFile))?.mcpWritesEnabled ?? true
+            let writesEnabled = (try? MCPAppConfig.read(from: configFile))?.mcpWritesEnabled ?? true
             if !writesEnabled {
                 return toolResult("「允许 MCP 写操作」已在 GitSpace 设置中关闭；请到 GitSpace 设置开启后重试，或改用只读工具查询。", isError: true)
             }
@@ -172,11 +167,6 @@ public actor MCPServer {
     }
 
     // MARK: - 配置与输出
-
-    static func readConfig(from url: URL) throws -> MCPAppConfig {
-        let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode(MCPAppConfig.self, from: data)
-    }
 
     private func writeResponse(_ value: JSONValue) {
         let encoder = JSONEncoder()
