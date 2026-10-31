@@ -22,7 +22,7 @@ public enum GSPaths {
         appSupportRoot.appendingPathComponent("config.json")
     }
 
-    /// skill 安装清单：记录已装 git-spece 的版本与时间（Story-1031-mcp）。
+    /// skill 安装清单：记录已装 git-space 的版本与时间（Story-1031-mcp）。
     public static var skillInstallManifest: URL {
         appSupportRoot.appendingPathComponent("skill-install.json")
     }

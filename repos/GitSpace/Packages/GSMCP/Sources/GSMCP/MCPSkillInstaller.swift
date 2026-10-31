@@ -1,8 +1,8 @@
 import Foundation
 
-/// git-spece skill 安装器（Story-1031-mcp）：
+/// git-space skill 安装器（Story-1031-mcp）：
 /// - 源：App Bundle 内的 Skill 资源（SPM `resources: [.copy("Skill")]`）；
-/// - 目标：`~/.agents/skills/git-spece/`（skill-unify SSOT 路径，本机各 Agent 平台可发现）；
+/// - 目标：`~/.agents/skills/git-space/`（skill-unify SSOT 路径，本机各 Agent 平台可发现）；
 /// - 更新判断：SKILL.md frontmatter 的 version 与 skill-install.json 清单比对；
 /// - 只覆盖源里存在的文件，目标目录内用户自加的文件一律不动。
 public enum MCPSkillInstaller {
@@ -104,10 +104,10 @@ public enum MCPSkillInstaller {
         return nil
     }
 
-    /// 默认目标目录：`~/.agents/skills/git-spece`（skill-unify SSOT）。
+    /// 默认目标目录：`~/.agents/skills/git-space`（skill-unify SSOT）。
     public static var defaultTargetDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".agents/skills/git-spece", isDirectory: true)
+            .appendingPathComponent(".agents/skills/git-space", isDirectory: true)
     }
 
     /// Bundle 内 skill 源目录。

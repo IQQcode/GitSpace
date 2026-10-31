@@ -2,7 +2,7 @@
 
 快速定位各资产与模块。**动文档或代码前先看本索引**；结构与职责的完整说明见 `docs/repo-structure.md`。
 
-最后更新：2026-10-31。MVP 与 Story-1030 界面对齐已落地；Story-1031 批次 A 第一批（交互底座 + 看与改核心 17 项 P0）已实施，47 测试全绿；同日 Story-1031-mcp-git-skill 落地（MCP server 59 工具 + git-spece skill 随包分发，75 测试全绿）；工程在 `repos/GitSpace`。`docs/epic/` 功能缺口与规划（待评审）为排期入口。
+最后更新：2026-10-31。MVP 与 Story-1030 界面对齐已落地；Story-1031 批次 A 第一批（交互底座 + 看与改核心 17 项 P0）已实施，47 测试全绿；同日 Story-1031-mcp-git-skill 落地（MCP server 59 工具 + git-space skill 随包分发，75 测试全绿）；工程在 `repos/GitSpace`。`docs/epic/` 功能缺口与规划（待评审）为排期入口。
 
 ## 一、文档资产
 
@@ -45,7 +45,7 @@
 | 新文件 / 新目录落哪 | `docs/repo-structure.md` 目录职责表 |
 | 新 Story 的规格 | `specs/[Story-MMDD]-<slug>/`（doc.md + summary.md） |
 | 各 Story 规格索引 | `specs/INDEX.md` |
-| MCP server 与 git-spece skill | `specs/Story-1031-mcp-git-skill/`、`skills/git-spece/`、`source/gitspace/overview.md`（mcp-serve 用法） |
+| MCP server 与 git-space skill | `specs/Story-1031-mcp-git-skill/`、`skills/git-space/`、`source/gitspace/overview.md`（mcp-serve 用法） |
 | 当前功能与交互全景 | `docs/func/GitSpace-Features-v1.0.md` |
 | 功能缺口、优先级与排期 | `docs/epic/INDEX.md`（各 Epic 文档在同目录） |
 | 术语与命名 | MRD §17.4（全篇唯一口径） |

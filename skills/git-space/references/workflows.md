@@ -1,4 +1,4 @@
-# git-spece 工作流手册
+# git-space 工作流手册
 
 通用约定：
 - 所有工具都需要 `repo` 参数 = 仓库根绝对路径（`list_repos` 可查 GitSpace 纳管清单）。

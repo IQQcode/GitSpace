@@ -13,7 +13,7 @@ struct SkillInstallTests {
         try FileManager.default.createDirectory(at: skillDir.appendingPathComponent("references"), withIntermediateDirectories: true)
         try """
         ---
-        name: git-spece
+        name: git-space
         description: 测试用
         version: \(version)
         ---
@@ -27,7 +27,7 @@ struct SkillInstallTests {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("gitspace-skill-dst-\(UUID().uuidString)", isDirectory: true)
         return (
-            dir.appendingPathComponent("git-spece", isDirectory: true),
+            dir.appendingPathComponent("git-space", isDirectory: true),
             dir.appendingPathComponent("manifest.json")
         )
     }

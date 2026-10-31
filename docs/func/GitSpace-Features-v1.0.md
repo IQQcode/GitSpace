@@ -90,8 +90,8 @@ GitSpace 是面向多仓库（50+ 组件仓）日常 Git 操作的 macOS 原生�
 
 ## 11. MCP 与 Agent（Story-1031-mcp，待评审）
 
-- **MCP server**：`GitSpaceApp mcp-serve`（stdio，本机 JSON-RPC），暴露 59 个 git 读写工具，全部复用引擎安全闸；读写规则与工具地图见 skill `git-spece`（`~/.agents/skills/git-spece/`）
+- **MCP server**：`GitSpaceApp mcp-serve`（stdio，本机 JSON-RPC），暴露 59 个 git 读写工具，全部复用引擎安全闸；读写规则与工具地图见 skill `git-space`（`~/.agents/skills/git-space/`）
 - **设置页**（设置 → MCP 与 Agent）：MCP 配置 JSON 复制、「允许 MCP 写操作」总开关（默认开）、skill 安装状态与手动重装
-- **skill 分发**：git-spece 打包进 App，启动时自动装入 `~/.agents/skills/git-spece/`（版本变更自动更新），也可手动安装/更新
+- **skill 分发**：git-space 打包进 App，启动时自动装入 `~/.agents/skills/git-space/`（版本变更自动更新），也可手动安装/更新
 - **留痕**：MCP 写操作双份日志（server 侧 `mcp.*` 前缀 + 引擎侧原始 action）
 - **破坏性操作**：12 个工具需显式 confirm 参数；硬闸（force push / reset --hard / clean / -f）不可绕过

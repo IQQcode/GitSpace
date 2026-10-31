@@ -5,7 +5,7 @@ import GSInfra
 
 /// 进程入口（Story-1031-mcp）：
 /// - `GitSpaceApp mcp-serve` → 以 stdio 运行 MCP server（GUI 不启动，stdout 为协议通道）；
-/// - 其余 → 正常 GUI 启动，并后台安装/更新 git-spece skill。
+/// - 其余 → 正常 GUI 启动，并后台安装/更新 git-space skill。
 @main
 struct MainEntry {
     static func main() async {
@@ -20,7 +20,7 @@ struct MainEntry {
             return
         }
 
-        // GUI 模式：后台安装/更新 git-spece skill 到 ~/.agents/skills（失败不打断启动）。
+        // GUI 模式：后台安装/更新 git-space skill 到 ~/.agents/skills（失败不打断启动）。
         Task.detached(priority: .utility) {
             Self.installSkillIfNeeded()
         }
@@ -39,7 +39,7 @@ struct MainEntry {
                 manifestFile: GSPaths.skillInstallManifest
             )
             if installed {
-                FileHandle.standardError.write(Data("[GitSpace] git-spece skill 已安装/更新到 ~/.agents/skills/git-spece\n".utf8))
+                FileHandle.standardError.write(Data("[GitSpace] git-space skill 已安装/更新到 ~/.agents/skills/git-space\n".utf8))
             }
         } catch {
             FileHandle.standardError.write(Data("[GitSpace] skill 安装失败：\(error)\n".utf8))

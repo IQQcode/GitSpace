@@ -34,7 +34,7 @@ struct MCPSettingsSection: View {
                     try? config.save()
                 }
 
-            LabeledContent("git-spece skill", value: skillVersionText)
+            LabeledContent("git-space skill", value: skillVersionText)
             HStack {
                 Button("安装 / 更新 skill") {
                     installSkill()
@@ -50,7 +50,7 @@ struct MCPSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("skill 安装到 ~/.agents/skills/git-spece（Agent 平台通用 SSOT）；启动时自动随版本更新。其他平台私有目录（如 ~/.claude/skills）可用 skill-unify sync 一次性链接同步。")
+            Text("skill 安装到 ~/.agents/skills/git-space（Agent 平台通用 SSOT）；启动时自动随版本更新。其他平台私有目录（如 ~/.claude/skills）可用 skill-unify sync 一次性链接同步。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

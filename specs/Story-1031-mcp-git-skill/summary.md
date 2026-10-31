@@ -1,6 +1,6 @@
 # Story-1031-mcp 实施总结（summary.md）
 
-> Story：GitSpace MCP 支持 + git-spece skill 内置分发。
+> Story：GitSpace MCP 支持 + git-space skill 内置分发。
 > 规格事实源：[doc.md](./doc.md)（§3 方案 / §5 验收 / §8 决策记录）；执行契约：[tasks.md](./tasks.md)。
 > 实施时间：2026-10-31，提交 W1 `d890f13` → W5 `本提交`。
 
@@ -11,7 +11,7 @@
 | W1 引擎 | `GitRepository+VCS.swift`：bisect（start/mark/reset/log）、cherry-pick、revert、abortPick；全部 `runWrite` 留痕，无 `-f`/`--force` | d890f13 |
 | W2 MCP 模块 | `Packages/GSMCP/`：JSON-RPC 2.0 + stdio server（59 工具，零第三方依赖）、ToolRegistry（public，含 names）、GitToolExecutor（读 22 + 写 36 + list_repos）、MCPAppConfig（fail-closed 语义）、MCPSkillInstaller | 9907f22 |
 | W3 App 接入 | `MainEntry`（`GitSpaceApp mcp-serve` 子命令分发，GUI 不受影响）、设置页「MCP 与 Agent」Section、skill 自动安装/更新（stderr 留痕） | 4f36e67 |
-| W4 skill | `skills/git-spece/`（SKILL.md + workflows + safety）→ `sync-skill.sh` 镜像进 Bundle 源 → skill-unify 落位 `~/.agents/skills/git-spece`（12 平台链接） | 464c0e4 |
+| W4 skill | `skills/git-space/`（SKILL.md + workflows + safety）→ `sync-skill.sh` 镜像进 Bundle 源 → skill-unify 落位 `~/.agents/skills/git-space`（12 平台链接） | 464c0e4 |
 | W5 收尾 | 文档回写（INDEX / specs / func / epic / overview）、DMG 双冒烟、独立审查 + 修复 | 本提交 |
 
 ## 2. 验证结果（全部为新鲜运行证据）
@@ -40,7 +40,7 @@
 1. **截断单位**：doc §3.2 原写「512KB 字节」，实现为 512,000 字符（Character 边界、UTF-8 安全）——doc 已按实现订正，语义上对 CJK 更宽松。
 2. **工具数 59**（非 doc §3.3 初稿的 58）：实现含 `git_abort_pick`（超出设计稿的合理补齐，中止 cherry-pick/revert 工作流需要），doc 已回写。
 3. **打包口径**：doc §3.1 原写「打包零改动/编译进二进制」，实际 SPM 资源是独立 bundle 需脚本补拷——doc 已订正。
-4. **skill 名按用户原文 `git-spece`**（疑为 `git-space` 笔误）：如需更名，改动面 = 目录名 + frontmatter name + SKILL.md 自述 + 重新 install，无代码耦合。
+4. **skill 名更名 `git-spece` → `git-space`**（2026-10-31 用户确认笔误）：改动面 = workspace 目录 git mv、frontmatter name、代码安装目标路径（MCPSkillInstaller）、设置页文案、skill 自述标题、全部文档引用、SSOT 重装；spec 历史稿中的旧名一并订正为现名。
 5. **EP09-F07 编号未正式入 epic Feature 表**：以 epic INDEX §7.9 回写建议行替代登记（避免与 109 Feature 计数产生未评审漂移），评审时正式编号入库。
 
 ## 5. 待评审决策（对齐 doc §8）

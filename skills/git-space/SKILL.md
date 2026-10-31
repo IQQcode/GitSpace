@@ -1,16 +1,16 @@
 ---
-name: git-spece
+name: git-space
 description: 通过 GitSpace 的本地 MCP server 执行 git 常规读写操作：状态查询、提交历史与 blame 追溯、暂存/提交/推送、分支/合并/冲突处理、stash、tag、cherry-pick、revert、二分查找定位坏提交（bisect）。当任务涉及查看仓库状态、历史、diff，或需要执行提交、分支、合并、回滚、二分定位等 git 操作时使用本 skill。
 version: 1.0.0
 ---
-# git-spece：GitSpace git 读写工作流
+# git-space：GitSpace git 读写工作流
 
 通过 GitSpace 内嵌的本地 MCP server（`GitSpaceApp mcp-serve`）操作 git 仓库。
 所有操作复用 GitSpace 引擎：数据来自系统 git CLI、破坏性操作受安全闸约束、写操作全量留痕可回溯。
 
 ## 连接
 
-1. 用户已安装 GitSpace.app；skill 由 App 自动装到 `~/.agents/skills/git-spece/`。
+1. 用户已安装 GitSpace.app；skill 由 App 自动装到 `~/.agents/skills/git-space/`。
 2. MCP 客户端配置（GitSpace 设置页「MCP 与 Agent → 复制 MCP 配置」可直接复制；command 路径以实际安装位置为准）：
 
 ```json

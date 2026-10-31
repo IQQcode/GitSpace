@@ -1,13 +1,13 @@
-# Story-1031: GitSpace MCP 支持与 git-spece skill 内置分发
+# Story-1031: GitSpace MCP 支持与 git-space skill 内置分发
 
 > 状态：设计定稿（决策项含「待评审」标注）。产出范围超出 MRD P0，按 epic 治理约定标注「待评审」，评审通过后回写 MRD。
 
 ## 1. 需求
 
 1. GitSpace 支持本机 MCP（Model Context Protocol）：把 `GSGitEngine` 的 git 读写能力以 MCP tools 暴露给本机 Agent 客户端（ZCode / Claude Code / Cursor 等）。
-2. 构建名为 `git-spece` 的 skill：教 Agent 用上述 MCP 工具完成 git 常规读写工作流（二分查找 commit / bisect、blame、历史追溯、stash、分支、提交、cherry-pick、revert 等）。
+2. 构建名为 `git-space` 的 skill：教 Agent 用上述 MCP 工具完成 git 常规读写工作流（二分查找 commit / bisect、blame、历史追溯、stash、分支、提交、cherry-pick、revert 等）。
 3. skill 随 App 分发：安装 App 后自动（且可手动重装）把 skill 写入 `~/.agents/skills`（skill-unify 确立的 SSOT 路径），装完即被 Agent 发现。
-4. 开发期 skill 源码落 workspace `skills/git-spece/`，经 skill-unify install 落位 SSOT。
+4. 开发期 skill 源码落 workspace `skills/git-space/`，经 skill-unify install 落位 SSOT。
 
 ## 2. 调研结论（约束与现状）
 
@@ -35,7 +35,7 @@ flowchart LR
     end
     M --> R[(GSGitEngine<br/>GitRepository + 硬闸 + JSONL)]
     M --> W[(GSIndex<br/>WorkspaceStore 纳管清单)]
-    B[Bundle Skill 资源] -- 安装/更新 --> K[(~/.agents/skills/git-spece<br/>skill-unify SSOT)]
+    B[Bundle Skill 资源] -- 安装/更新 --> K[(~/.agents/skills/git-space<br/>skill-unify SSOT)]
 ```
 
 - **新模块 `GSMCP`**（`Packages/GSMCP/Sources/GSMCP/`）：MCP stdio server + tool 注册表 + 引擎映射 + skill 安装器。依赖 `GSGitEngine`、`GSIndex`、`GSInfra`，**不 import SwiftUI**。依赖图变为：`GitSpaceApp → (GSFeatures, GSMCP) → (GSGitEngine, GSIndex, GSDesignKit) → GSInfra`。
@@ -100,13 +100,13 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 ### 3.6 skill 安装与分发（位置规划依据 skill-unify）
 
 - **SSOT**：`~/.agents/skills`（skill-unify 默认生态路径，OpenCode / Cline 原生读取；本机 ZCode 亦发现该路径）。App 只写 SSOT，不复制到各平台私有目录——平台差异由用户侧 `skill-unify sync` 处理，App 不重新实现其链接逻辑（YAGNI）。
-- **内置**：skill 源在 workspace `skills/git-spece/`；构建时经 GSMCP 的 `resources: [.copy("Skill")]` 进入二进制（`Bundle.module`）。发布前以脚本同步 `skills/git-spece/ → Packages/GSMCP/Sources/GSMCP/Skill/`（`scripts/sync-skill.sh`，源为唯一事实源，防止双份漂移；GSMCP 侧目录进 .gitignore？不——SPM resources 必须在源码树内且随仓库提交，采用「脚本同步 + 提交两份、源为准、CI 前校验一致」的简化策略，校验放在 sync 脚本 `--check` 模式）。
-- **安装时机**：GUI 启动时对比 bundle 内 skill 版本（SKILL.md frontmatter `version:`）与已装版本（`GSPaths.appSupportRoot/skill-install.json` 记录版本+时间），bundle 较新或未装则自动覆盖写入 `~/.agents/skills/git-spece/`；设置页提供「安装/更新 skill」按钮 + 状态行（未装/已装 vX）。
+- **内置**：skill 源在 workspace `skills/git-space/`；构建时经 GSMCP 的 `resources: [.copy("Skill")]` 进入二进制（`Bundle.module`）。发布前以脚本同步 `skills/git-space/ → Packages/GSMCP/Sources/GSMCP/Skill/`（`scripts/sync-skill.sh`，源为唯一事实源，防止双份漂移；GSMCP 侧目录进 .gitignore？不——SPM resources 必须在源码树内且随仓库提交，采用「脚本同步 + 提交两份、源为准、CI 前校验一致」的简化策略，校验放在 sync 脚本 `--check` 模式）。
+- **安装时机**：GUI 启动时对比 bundle 内 skill 版本（SKILL.md frontmatter `version:`）与已装版本（`GSPaths.appSupportRoot/skill-install.json` 记录版本+时间），bundle 较新或未装则自动覆盖写入 `~/.agents/skills/git-space/`；设置页提供「安装/更新 skill」按钮 + 状态行（未装/已装 vX）。
 - 写入规则：整目录覆盖（`SKILL.md` + `references/`），保留用户在目录内的其他文件不删（只覆盖已知文件名清单）。
 
-### 3.7 git-spece skill 内容（源：workspace `skills/git-spece/`）
+### 3.7 git-space skill 内容（源：workspace `skills/git-space/`）
 
-- `SKILL.md`（frontmatter：name=git-spece、description 触发词覆盖「git 操作/bisect 二分/blame/历史/stash/分支/cherry-pick/revert」）：先讲连接方式（App 安装后 MCP server 配置片段）、工具分组地图、读写安全规则（⚠ 工具先看影响再 confirm）。
+- `SKILL.md`（frontmatter：name=git-space、description 触发词覆盖「git 操作/bisect 二分/blame/历史/stash/分支/cherry-pick/revert」）：先讲连接方式（App 安装后 MCP server 配置片段）、工具分组地图、读写安全规则（⚠ 工具先看影响再 confirm）。
 - `references/workflows.md`：核心工作流手册——bisect 二分定位坏提交（完整对话脚本）、提交链路（status→stage→commit→push）、历史追溯（log/blame/file_history/show_file 组合）、stash 临时切换、分支与合并、cherry-pick 摘取修复、revert 回滚。
 - `references/safety.md`：硬闸清单、破坏性工具表、JSONL 日志位置（`~/Library/Application Support/GitSpace/logs/`）。
 
@@ -114,7 +114,7 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 
 - MCP 状态行 + 「复制 MCP 配置」按钮（JSON 片段：`{"command": "<可执行文件路径>", "args": ["mcp-serve"]}`，路径用 `Bundle.main.executableURL`，含 `swift run` 开发态回退）。
 - 「允许 MCP 写操作」开关（默认开）→ 写 config.json。
-- git-spece skill 状态行（未安装/已装 vN）+ 「安装/更新 skill」按钮 + 「打开 skill 目录」。
+- git-space skill 状态行（未安装/已装 vN）+ 「安装/更新 skill」按钮 + 「打开 skill 目录」。
 
 ## 4. 不做（YAGNI）
 
@@ -127,7 +127,7 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 3. 硬闸回归：经 MCP 无法触发 force push / reset --hard / clean / `-f`（引擎测试已覆盖，补 MCP 层转译断言）。
 4. ⚠ 工具缺 `confirm:true` 时被拒且说明影响；`mcpWritesEnabled=false` 时全部写工具被拒。
 5. bisect：在 fixture 仓库（含注入 bug 的提交链）上 start→good/bad 迭代→定位→reset，结果与 `git bisect` 手工执行等价（reflog / log 交叉校验）。
-6. App 安装后 `~/.agents/skills/git-spece/SKILL.md` 存在且与 workspace 源一致；bundle 版本更新后再次启动自动覆盖。
+6. App 安装后 `~/.agents/skills/git-space/SKILL.md` 存在且与 workspace 源一致；bundle 版本更新后再次启动自动覆盖。
 7. `swift build` / `swift test` 全绿；`scripts/package-dmg.sh` 产物含新能力（子命令冒烟）。
 8. 文档回写：INDEX.md、docs/INDEX.md、specs/INDEX.md、func、epic（新增 EP09-F07 MCP，标待评审）。
 
@@ -138,7 +138,7 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 | W1 | 引擎补齐 bisect / cherry-pick / revert + 等价性测试 | 改造 GSGitEngine | `GitRepository+VCS.swift`、`Tests/GSGitEngineTests/VCSTests.swift` |
 | W2 | GSMCP 模块：协议层 + 工具注册 + 引擎映射 + config 读取 + 协议/工具测试 | 新增模块 | `Packages/GSMCP/**`、`Package.swift` |
 | W3 | App 接入：MainEntry 子命令分发 + 设置页 Section + skill 安装器（Bundle→SSOT，版本管理） | 改造 App | `GitSpaceApp.swift`、`SettingsView.swift`、`GSInfra/Paths.swift`（config/skill-install 路径） |
-| W4 | git-spece skill 编写（SKILL.md + references）+ skill-unify 落位 SSOT + sync 脚本 | 新增 | `skills/git-spece/**`、`scripts/sync-skill.sh` |
+| W4 | git-space skill 编写（SKILL.md + references）+ skill-unify 落位 SSOT + sync 脚本 | 新增 | `skills/git-space/**`、`scripts/sync-skill.sh` |
 | W5 | 收尾：全量构建/测试/DMG 冒烟 + 文档回写 + summary.md | 收尾 | specs/、INDEX.md、docs/** |
 
 依赖：W1 → W2（工具映射需要新 API）；W4 依赖 W2 的工具清单定稿；W3 与 W1 并行可行、依赖 W2 入口；串行 W1→W2→W3→W4→W5。
@@ -146,7 +146,7 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 ## 7. 风险与备注
 
 - MCP 协议手写需对齐客户端实现：以 newline-delimited JSON + 标准 handshake 为准，用真实客户端（ZCode）冒烟验证。
-- `~/.agents/skills` 是用户全局目录：App 只写 `git-spece/` 自己的子目录，绝不触碰其他 skill。
+- `~/.agents/skills` 是用户全局目录：App 只写 `git-space/` 自己的子目录，绝不触碰其他 skill。
 - 当前工作区有未提交改动（BlameSheet / DiffFileView 等，属 Story-1031-p0-batch1 线）：本 Story 不触碰这些文件；提交只包含本 Story 文件。
 - 二进制体积：新增模块预计 <1MB（源码级增量），60MB 约束无虞。
 
@@ -154,7 +154,7 @@ public func revert(sha: String, noCommit: Bool) async throws -> MergeOutcome
 
 | # | 决策 | 依据 | 状态 |
 |---|---|---|---|
-| D1 | skill 名用用户原文 `git-spece` | 用户显式指定；后续改名仅需改目录名+frontmatter+引用 | 按原文执行 |
+| D1 | skill 名定为 `git-space`（用户确认初稿 `git-space` 为笔误，2026-10-31 更名） | 与产品名 GitSpace 一致 | 已定 |
 | D2 | MCP server = 主二进制子命令 `mcp-serve` | 单二进制、打包零改动、包体不变 | 推荐 |
 | D3 | 写操作默认开启 + ⚠ 工具 confirm 参数 + 设置页总开关 | 用户要「读写 skill」；硬闸与 JSONL 不动 | 待评审（WP-1） |
 | D4 | 引擎补齐 bisect + cherry-pick + revert | 用户点名 bisect；revert/cherry-pick 是 skill 工作流完整性需要 | 推荐 |

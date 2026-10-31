@@ -1,12 +1,12 @@
 #!/bin/bash
 # 同步 workspace skill 源 → SPM 资源目录（App Bundle 内置 skill 的唯一来源，Story-1031-mcp）
 # 用法：scripts/sync-skill.sh [--check]
-#   默认：镜像 skills/git-spece 到 Packages/GSMCP/Sources/GSMCP/Skill
+#   默认：镜像 skills/git-space 到 Packages/GSMCP/Sources/GSMCP/Skill
 #   --check：只校验两侧一致，不一致时退出码 1
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/../../skills/git-spece"
+SRC="$ROOT/../../skills/git-space"
 DST="$ROOT/Packages/GSMCP/Sources/GSMCP/Skill"
 
 [ -d "$SRC" ] || { echo "错误：skill 源不存在：$SRC"; exit 1; }

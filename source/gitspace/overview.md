@@ -13,7 +13,7 @@ GitSpace MVP：面向多仓库工程的 macOS 原生 Git 客户端（MRD 路线�
 - **合并与冲突**：ff / no-ff merge；冲突列表与 `git status --porcelain=v2` 逐项一致；取当前 / 取对方 / 生成合并标记 / 标记已解决；随时中止合并。
 - **stash / tag**：保存（带 message）、pop / apply / drop；轻量与附注 tag 创建、删除。
 - **安全边界（引擎硬闸）**：永不 force push（参数级拦截）；不接受 `reset --hard` / `clean` / `-f`；全部写操作写 JSONL 操作日志。
-- **MCP 与 git-spece skill（Story-1031-mcp，待评审）**：`GitSpaceApp mcp-serve` 以 stdio 暴露 59 个 git 读写工具（复用引擎与安全闸）；设置页提供写开关与 MCP 配置复制；git-spece skill 随包内置，启动/手动装入 `~/.agents/skills/git-spece/`（skill-unify SSOT）。
+- **MCP 与 git-space skill（Story-1031-mcp，待评审）**：`GitSpaceApp mcp-serve` 以 stdio 暴露 59 个 git 读写工具（复用引擎与安全闸）；设置页提供写开关与 MCP 配置复制；git-space skill 随包内置，启动/手动装入 `~/.agents/skills/git-space/`（skill-unify SSOT）。
 
 ## 对内依赖
 
