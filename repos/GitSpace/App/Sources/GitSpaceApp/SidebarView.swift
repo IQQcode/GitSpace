@@ -6,7 +6,7 @@ import GSDesignKit
 /// 左侧栏：工作区卡片 + 仓库列表（同步状态徽标）+ 纳管动作。
 struct SidebarView: View {
     @Environment(AppModel.self) private var app
-    @Binding var tab: RootView.MainTab
+    @Binding var tab: MainTab
     @State private var query = ""
     @State private var repoToRemove: ManagedRepo?
 
@@ -66,6 +66,11 @@ struct SidebarView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            if let summary = branchConsistencySummary {
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(summary.contains("一致") ? Color.gs(.green) : Color.gs(.amber))
+            }
             Text(freshnessText).font(.caption2).foregroundStyle(.tertiary)
             if app.isRefreshing {
                 ProgressView().progressViewStyle(.linear).frame(height: 2)
@@ -75,6 +80,23 @@ struct SidebarView: View {
         .background(Color.gs(.accent).opacity(0.06))
         .padding(.horizontal, GSSpacing.s)
         .padding(.top, GSSpacing.s)
+    }
+
+    /// 分支一致性小结（EP05-F03）：基准 = 多数仓当前分支。
+    private var branchConsistencySummary: String? {
+        let branches = app.repos.compactMap(\.branchName)
+        guard branches.count >= 2, let baseline = branchBaseline else { return nil }
+        let aligned = branches.filter { $0 == baseline }.count
+        return aligned == branches.count
+            ? "分支一致 \(aligned) / \(branches.count)（均在 \(baseline)）"
+            : "分支一致 \(aligned) / \(branches.count)，基准 \(baseline)"
+    }
+
+    private var branchBaseline: String? {
+        let branches = app.repos.compactMap(\.branchName)
+        var counts: [String: Int] = [:]
+        for branch in branches { counts[branch, default: 0] += 1 }
+        return counts.max { $0.value < $1.value }?.key
     }
 
     private var workspaceSubtitle: String {
@@ -203,10 +225,43 @@ private struct KeyboardShortcutHandler: View {
 }
 
 struct RepoRow: View {
+    @Environment(AppModel.self) private var app
     let repo: ManagedRepo
     let isSelected: Bool
     let onSelect: () -> Void
     let onRemove: () -> Void
+    @AppStorage("externalTerminal") private var externalTerminal = "terminal"
+    @AppStorage("externalTerminalCustom") private var externalTerminalCustom = ""
+    @AppStorage("externalEditor") private var externalEditor = "xcode"
+    @AppStorage("externalEditorCustom") private var externalEditorCustom = ""
+
+    private var repoURL: URL { URL(fileURLWithPath: repo.config.expandedPath) }
+
+    private func openInTerminal() {
+        do {
+            try ExternalToolsLauncher.openInTerminal(
+                ExternalTerminal(rawValue: externalTerminal) ?? .terminal,
+                repoPath: repoURL,
+                customTemplate: externalTerminalCustom
+            )
+        } catch {
+            app.toasts.show(GitPresenter.text(for: error), isError: true)
+        }
+    }
+
+    private func openInEditor(file: URL?, line: Int?) {
+        do {
+            try ExternalToolsLauncher.openInEditor(
+                ExternalEditor(rawValue: externalEditor) ?? .xcode,
+                repoPath: repoURL,
+                file: file,
+                line: line,
+                customTemplate: externalEditorCustom
+            )
+        } catch {
+            app.toasts.show(GitPresenter.text(for: error), isError: true)
+        }
+    }
 
     var body: some View {
         Button(action: onSelect) {
@@ -241,6 +296,13 @@ struct RepoRow: View {
         .contextMenu {
             Button("在访达中显示") {
                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.config.path)
+            }
+            Divider()
+            Button("在终端打开") { openInTerminal() }
+            Button("在编辑器打开") { openInEditor(file: nil, line: nil) }
+            Button("复制路径") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(repo.config.expandedPath, forType: .string)
             }
             Divider()
             Button("从工作区移除…", role: .destructive, action: onRemove)

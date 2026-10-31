@@ -21,6 +21,41 @@ struct GitSpaceApp: App {
                     .keyboardShortcut("k", modifiers: .command)
                 Button("切换深浅色主题") { cycleAppearance() }
                     .keyboardShortcut("l", modifiers: [.command, .shift])
+
+                Divider()
+                Button("添加仓库…") { appModel.activeSheet = .addRepo }
+                    .keyboardShortcut("o", modifiers: .command)
+                Button("扫描父目录…") { appModel.activeSheet = .scan }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
+                Button("导入 mgit 清单…") { appModel.activeSheet = .importManifest }
+
+                Divider()
+                Button("新建 / 管理分支") { appModel.openRepoSheet(.branch) }
+                    .keyboardShortcut("b", modifiers: [.command, .shift])
+                Button("合并分支") { appModel.openRepoSheet(.merge) }
+                    .keyboardShortcut("m", modifiers: [.command, .shift])
+                Button("打开 Stash") { appModel.openRepoSheet(.stash) }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                Button("打开 Tag 管理") { appModel.openRepoSheet(.tag) }
+                    .keyboardShortcut("t", modifiers: [.command, .shift])
+
+                Divider()
+                Button("全部仓库 Fetch") { appModel.runBatch(.fetch, repos: appModel.repos) }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+                Button("批量 Pull（选中待同步仓库）") { appModel.bulkPull() }
+                Button("批量 Push（选中未推送仓库）") { appModel.bulkPush() }
+
+                Divider()
+                Button("查看统一时间线") { appModel.requestedTab = .timeline }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("查看提交") { appModel.requestedTab = .commit }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("查看多仓状态") { appModel.requestedTab = .status }
+                    .keyboardShortcut("3", modifiers: .command)
+                Button("查看变更集") { appModel.requestedTab = .changeset }
+                    .keyboardShortcut("4", modifiers: .command)
+                Button("查看聚合检索") { appModel.requestedTab = .search }
+                    .keyboardShortcut("5", modifiers: .command)
             }
         }
 

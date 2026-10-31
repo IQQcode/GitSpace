@@ -72,6 +72,40 @@ public final class AppModel {
         repos.first { $0.id == selectedRepoPath }
     }
 
+    // MARK: 命令入口（菜单快捷键与命令面板共用，EP12-F01）
+
+    /// 菜单/快捷键请求切换的视图（⌘1–⌘5），RootView 消费后置空。
+    public var requestedTab: MainTab?
+
+    public func openRepoSheet(_ sheet: AppSheet) {
+        guard selectedRepo != nil else {
+            toasts.show("请先在左侧选择一个仓库", isError: true)
+            return
+        }
+        activeSheet = sheet
+    }
+
+    public func runBatch(_ action: BatchAction, repos: [ManagedRepo]) {
+        batch.start(action: action, repos: repos)
+        activeSheet = .batch
+    }
+
+    /// 批量 Pull：选中所有 ahead/behind 的仓并执行。
+    public func bulkPull() {
+        let targets = repos.filter { ($0.status?.ahead ?? 0) > 0 || ($0.status?.behind ?? 0) > 0 }
+        selectedRepos = Set(targets.map(\.id))
+        requestedTab = .status
+        runBatch(.pull, repos: targets)
+    }
+
+    /// 批量 Push：预检后进推送确认（EP05-F02）。
+    public func bulkPush() {
+        let targets = repos.filter { ($0.status?.ahead ?? 0) > 0 }
+        selectedRepos = Set(targets.map(\.id))
+        requestedTab = .status
+        Task { await openPushConfirmation(for: targets) }
+    }
+
     public var repoCount: Int { repos.count }
     public var cleanCount: Int { repos.filter { ($0.status?.isClean ?? false) && !$0.needsAttention }.count }
     public var pendingSyncCount: Int {
@@ -238,6 +272,22 @@ public final class AppModel {
         guard !targets.isEmpty else { return }
         batch.start(action: .push, repos: targets)
         activeSheet = .batch
+    }
+}
+
+// MARK: - 主视图枚举（菜单快捷键与命令面板共用，EP12-F01）
+
+public enum MainTab: String, CaseIterable, Identifiable, Sendable {
+    case timeline, commit, status, changeset, search
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .timeline: return "统一时间线"
+        case .commit: return "提交"
+        case .status: return "多仓状态"
+        case .changeset: return "变更集"
+        case .search: return "聚合检索"
+        }
     }
 }
 

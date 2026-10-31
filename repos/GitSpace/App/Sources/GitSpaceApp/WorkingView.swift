@@ -8,6 +8,8 @@ struct WorkingView: View {
     @Environment(AppModel.self) private var app
     @Bindable var vm: RepoViewModel
     let onOpenCommit: (String) -> Void
+    @AppStorage("externalEditor") private var externalEditor = "xcode"
+    @AppStorage("externalEditorCustom") private var externalEditorCustom = ""
     @State private var hunkSelection = Set<Int>()
     @State private var pendingDiscard: PendingDiscard?
     @State private var isCommitting = false
@@ -77,6 +79,24 @@ struct WorkingView: View {
             return "将丢弃 \(vm.unstagedEntries.count) 个文件的改动与 \(vm.untrackedEntries.count) 个未跟踪文件。丢弃前会自动创建快照，可撤销。"
         default:
             return "丢弃前会自动创建快照，丢弃后可通过通知条撤销。"
+        }
+    }
+
+    // MARK: 外部工具（EP09-F01）
+
+    private func openInEditor(_ relativePath: String, line: Int?) {
+        guard let repo = app.selectedRepo else { return }
+        let url = repo.config.fileURL(relativePath)
+        do {
+            try ExternalToolsLauncher.openInEditor(
+                ExternalEditor(rawValue: externalEditor) ?? .xcode,
+                repoPath: url.deletingLastPathComponent().deletingLastPathComponent(),
+                file: url,
+                line: line,
+                customTemplate: externalEditorCustom
+            )
+        } catch {
+            app.toasts.show(GitPresenter.text(for: error), isError: true)
         }
     }
 
@@ -181,6 +201,7 @@ struct WorkingView: View {
                         Button("Blame") { blameRequest = FileToolRequest(path: entry.path) }
                         Button("文件历史") { historyRequest = FileToolRequest(path: entry.path) }
                         Divider()
+                        Button("在编辑器打开") { openInEditor(entry.path, line: nil) }
                         Button("复制路径") {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(entry.path, forType: .string)
@@ -229,6 +250,7 @@ struct WorkingView: View {
                         Button("Blame") { blameRequest = FileToolRequest(path: entry.path) }
                         Button("文件历史") { historyRequest = FileToolRequest(path: entry.path) }
                         Divider()
+                        Button("在编辑器打开") { openInEditor(entry.path, line: nil) }
                         Button("复制路径") {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(entry.path, forType: .string)

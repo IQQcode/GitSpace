@@ -8,6 +8,10 @@ struct SettingsView: View {
     @AppStorage("appearance") private var appearance = "system"
     @AppStorage("mergeTool") private var mergeTool = "filemerge"
     @AppStorage("mergeToolCustomTemplate") private var mergeToolCustomTemplate = ""
+    @AppStorage("externalTerminal") private var externalTerminal = "terminal"
+    @AppStorage("externalTerminalCustom") private var externalTerminalCustom = ""
+    @AppStorage("externalEditor") private var externalEditor = "xcode"
+    @AppStorage("externalEditorCustom") private var externalEditorCustom = ""
 
     var body: some View {
         @Bindable var app = app
@@ -63,6 +67,30 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                 }
                 Text("工具退出后 GitSpace 会检查冲突标记；只有你确认后才执行 git add。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("终端与编辑器（EP09-F01）") {
+                Picker("终端", selection: $externalTerminal) {
+                    ForEach(ExternalTerminal.allCases) { terminal in
+                        Text(terminal.displayName).tag(terminal.rawValue)
+                    }
+                }
+                if externalTerminal == ExternalTerminal.custom.rawValue {
+                    TextField("终端命令模板（$REPO $FILE $LINE）", text: $externalTerminalCustom)
+                        .textFieldStyle(.roundedBorder)
+                }
+                Picker("编辑器", selection: $externalEditor) {
+                    ForEach(ExternalEditor.allCases) { editor in
+                        Text(editor.displayName).tag(editor.rawValue)
+                    }
+                }
+                if externalEditor == ExternalEditor.custom.rawValue {
+                    TextField("编辑器命令模板（$REPO $FILE $LINE）", text: $externalEditorCustom)
+                        .textFieldStyle(.roundedBorder)
+                }
+                Text("文件行右键「在编辑器打开」可定位到行（xed --line / code --goto file:line）。路径以独立参数传入。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -9,20 +9,6 @@ struct RootView: View {
     @State private var tab: MainTab = .timeline
     @AppStorage("appearance") private var appearance = "system"
 
-    enum MainTab: String, CaseIterable, Identifiable {
-        case timeline, commit, status, changeset, search
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .timeline: return "统一时间线"
-            case .commit: return "提交"
-            case .status: return "多仓状态"
-            case .changeset: return "变更集"
-            case .search: return "聚合检索"
-            }
-        }
-    }
-
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
@@ -46,6 +32,12 @@ struct RootView: View {
             repoVM.draftProvider = { app.commitDrafts[$0] }
             repoVM.draftStore = { app.commitDrafts[$0] = $1 }
             await initialLoad()
+        }
+        .onChange(of: app.requestedTab) {
+            if let requested = app.requestedTab {
+                tab = requested
+                app.requestedTab = nil
+            }
         }
         .onChange(of: app.selectedRepoPath) {
             Task { await repoVM.bind(to: app.selectedRepo) }
@@ -173,31 +165,17 @@ struct RootView: View {
     private var paletteCommands: [PaletteCommand] {
         [
             PaletteCommand(label: "切换深浅色主题", shortcut: "⌘⇧L") { cycleTheme() },
-            PaletteCommand(label: "全部仓库 Fetch", shortcut: "⌘⇧F") { runBatch(.fetch, repos: app.repos) },
-            PaletteCommand(label: "批量 Pull（选中待同步仓库）", shortcut: nil) {
-                let targets = app.repos.filter { ($0.status?.ahead ?? 0) > 0 || ($0.status?.behind ?? 0) > 0 }
-                app.selectedRepos = Set(targets.map(\.id)); tab = .status; runBatch(.pull, repos: targets)
-            },
-            PaletteCommand(label: "批量 Push（选中未推送仓库）", shortcut: nil) {
-                let targets = app.repos.filter { ($0.status?.ahead ?? 0) > 0 }
-                app.selectedRepos = Set(targets.map(\.id)); tab = .status
-                Task { await app.openPushConfirmation(for: targets) }
-            },
-            PaletteCommand(label: "新建 / 管理分支", shortcut: "⌘⇧B") { openRepoSheet(.branch) },
-            PaletteCommand(label: "合并分支", shortcut: "⌘⇧M") { openRepoSheet(.merge) },
-            PaletteCommand(label: "打开 Stash", shortcut: "⌘⇧S") { openRepoSheet(.stash) },
-            PaletteCommand(label: "打开 Tag 管理", shortcut: "⌘⇧T") { openRepoSheet(.tag) },
+            PaletteCommand(label: "全部仓库 Fetch", shortcut: "⌘⇧F") { app.runBatch(.fetch, repos: app.repos) },
+            PaletteCommand(label: "批量 Pull（选中待同步仓库）", shortcut: nil) { app.bulkPull() },
+            PaletteCommand(label: "批量 Push（选中未推送仓库）", shortcut: nil) { app.bulkPush() },
+            PaletteCommand(label: "新建 / 管理分支", shortcut: "⌘⇧B") { app.openRepoSheet(.branch) },
+            PaletteCommand(label: "合并分支", shortcut: "⌘⇧M") { app.openRepoSheet(.merge) },
+            PaletteCommand(label: "打开 Stash", shortcut: "⌘⇧S") { app.openRepoSheet(.stash) },
+            PaletteCommand(label: "打开 Tag 管理", shortcut: "⌘⇧T") { app.openRepoSheet(.tag) },
             PaletteCommand(label: "添加仓库", shortcut: "⌘O") { app.activeSheet = .addRepo },
             PaletteCommand(label: "扫描父目录", shortcut: "⌘⇧O") { app.activeSheet = .scan },
             PaletteCommand(label: "导入 mgit 清单", shortcut: nil) { app.activeSheet = .importManifest }
         ]
-    }
-
-    private func openRepoSheet(_ sheet: AppSheet) {
-        guard app.selectedRepo != nil else {
-            app.toasts.show("请先在左侧选择一个仓库", isError: true); return
-        }
-        app.activeSheet = sheet
     }
 
     /// Blame / 文件历史点击行 → 时间线定位（EP03-F03；仅限已加载时间窗内提交）。

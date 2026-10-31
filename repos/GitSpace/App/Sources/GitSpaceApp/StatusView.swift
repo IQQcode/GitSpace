@@ -10,6 +10,27 @@ struct StatusView: View {
     let onPushConfirm: ([ManagedRepo]) -> Void
     @State private var selection = Set<String>()
     @State private var expanded = true
+    @State private var showOnlyMismatched = false
+
+    /// 基准分支 = 多数仓当前所在分支（EP05-F03；固定基准随 EP01 工作区设置）。
+    var baselineBranch: String? {
+        let branches = app.repos.compactMap(\.branchName)
+        var counts: [String: Int] = [:]
+        for branch in branches { counts[branch, default: 0] += 1 }
+        return counts.max { $0.value < $1.value }?.key
+    }
+
+    var mismatchedRepos: [ManagedRepo] {
+        guard let baseline = baselineBranch else { return [] }
+        return app.repos.filter { repo in
+            guard let branch = repo.branchName else { return false }
+            return branch != baseline
+        }
+    }
+
+    var displayedRepos: [ManagedRepo] {
+        showOnlyMismatched ? mismatchedRepos : app.repos
+    }
 
     var selectedRepos: [ManagedRepo] {
         app.repos.filter { selection.contains($0.id) }
@@ -19,6 +40,7 @@ struct StatusView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: GSSpacing.m) {
+                    consistencyBanner
                     statStrip
                     repoTable
                 }
@@ -30,6 +52,32 @@ struct StatusView: View {
                     bulkBar
                 }
             }
+        }
+    }
+
+    /// 分支一致性提示（EP05-F03）：「N 个仓不在基准分支上 [只看这些仓]」。
+    @ViewBuilder
+    private var consistencyBanner: some View {
+        if let baseline = baselineBranch, !mismatchedRepos.isEmpty {
+            HStack(spacing: GSSpacing.s) {
+                Image(systemName: "arrow.triangle.branch")
+                    .foregroundStyle(Color.gs(.amber))
+                Text("\(mismatchedRepos.count) 个仓不在 \(baseline) 上")
+                    .font(.callout.weight(.medium))
+                Text(mismatchedRepos.prefix(3).map(\.displayName).joined(separator: "、"))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                Spacer()
+                Button(showOnlyMismatched ? "显示全部" : "只看这些仓") {
+                    showOnlyMismatched.toggle()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, GSSpacing.m)
+            .padding(.vertical, GSSpacing.s)
+            .background(Color.gs(.amber).opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
         }
     }
 
@@ -48,9 +96,10 @@ struct StatusView: View {
             Grid(horizontalSpacing: GSSpacing.s, verticalSpacing: 0) {
                 tableHeader
                 Divider().gridCellUnsizedAxes([.horizontal])
-                ForEach(app.repos) { repo in
+                ForEach(displayedRepos) { repo in
                     StatusRow(
                         repo: repo,
+                        isOffBaseline: repo.branchName != nil && repo.branchName != baselineBranch,
                         isSelected: selection.contains(repo.id),
                         onToggle: { toggle(repo) },
                         onFetch: { onRunBatch(.fetch, [repo]) },
@@ -154,6 +203,8 @@ struct StatusView: View {
 private struct StatusRow: View {
     @Environment(AppModel.self) private var app
     let repo: ManagedRepo
+    /// 不在基准分支上（EP05-F03 行内标注）。
+    let isOffBaseline: Bool
     let isSelected: Bool
     let onToggle: () -> Void
     let onFetch: () -> Void
@@ -188,10 +239,20 @@ private struct StatusRow: View {
     private var branchCell: some View {
         Group {
             if let status = repo.status {
-                Text(status.branch ?? "(detached HEAD)")
-                    .font(.gsMonoSmall)
-                    .foregroundColor(status.detached ? Color.gs(.amber) : Color.gs(.accent))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(status.branch ?? "(detached HEAD)")
+                        .font(.gsMonoSmall)
+                        .foregroundColor(status.detached ? Color.gs(.amber) : Color.gs(.accent))
+                        .lineLimit(1)
+                    if isOffBaseline {
+                        Text("≠基准")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color.gs(.amber))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.gs(.amber).opacity(0.14), in: Capsule())
+                    }
+                }
             } else {
                 Text("—").foregroundStyle(.tertiary)
             }
