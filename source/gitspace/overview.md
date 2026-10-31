@@ -13,10 +13,11 @@ GitSpace MVP：面向多仓库工程的 macOS 原生 Git 客户端（MRD 路线�
 - **合并与冲突**：ff / no-ff merge；冲突列表与 `git status --porcelain=v2` 逐项一致；取当前 / 取对方 / 生成合并标记 / 标记已解决；随时中止合并。
 - **stash / tag**：保存（带 message）、pop / apply / drop；轻量与附注 tag 创建、删除。
 - **安全边界（引擎硬闸）**：永不 force push（参数级拦截）；不接受 `reset --hard` / `clean` / `-f`；全部写操作写 JSONL 操作日志。
+- **MCP 与 git-spece skill（Story-1031-mcp，待评审）**：`GitSpaceApp mcp-serve` 以 stdio 暴露 59 个 git 读写工具（复用引擎与安全闸）；设置页提供写开关与 MCP 配置复制；git-spece skill 随包内置，启动/手动装入 `~/.agents/skills/git-spece/`（skill-unify SSOT）。
 
 ## 对内依赖
 
-依赖方向单向：`GitSpaceApp → GSFeatures → (GSGitEngine, GSIndex, GSDesignKit) → GSInfra`；`GSGitEngine` 与 `GSIndex` 不 import SwiftUI。外部零第三方依赖（GRDB 索引层见 spec 偏离项，M0 验证后引入）。
+依赖方向单向：`GitSpaceApp → (GSFeatures, GSMCP) → (GSGitEngine, GSIndex, GSDesignKit) → GSInfra`；`GSGitEngine` / `GSIndex` / `GSMCP` 不 import SwiftUI。外部零第三方依赖（GRDB 索引层见 spec 偏离项，M0 验证后引入）。
 
 ## 模块地图
 
@@ -26,6 +27,7 @@ GitSpace MVP：面向多仓库工程的 macOS 原生 Git 客户端（MRD 路线�
 | `Packages/GSGitEngine` | git CLI 进程执行器（超时/取消/重试/安全闸）、porcelain v2 / log / for-each-ref / unified diff 解析器、单仓 actor 门面 |
 | `Packages/GSIndex` | 工作区扫描器、工作区配置存储、跨仓时间线聚合（每仓一 lane） |
 | `Packages/GSFeatures` | AppModel / TimelineModel / RepoViewModel / BatchSyncModel（@Observable） |
+| `Packages/GSMCP` | MCP stdio server（59 工具，映射 GitRepository 与安全闸）、MCPAppConfig、MCPSkillInstaller；`mcp-serve` 子命令承载 |
 | `Packages/GSDesignKit` | 设计令牌（取色基准 = 交互原型深浅主题）、色板、mono 字体、图列常量 |
 | `Packages/GSInfra` | 应用路径约定、JSONL 操作日志、AsyncSemaphore |
 | `Packages/GSTestSupport` | GitShell（同步 CLI 基准）+ FixtureRepo（多 hunk / 冲突 / 钩子场景生成器） |

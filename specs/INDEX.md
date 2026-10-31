@@ -10,6 +10,7 @@
 | `Story-1029-mvp-coding/` | 已实施 | MVP 编码实施记录与 5 条待评审偏离项 | doc.md, summary.md |
 | `Story-1030-app-ui-alignment/` | 已实施（构建 + 单测通过） | App 界面对齐原型：顶部栏 / 五视图 tab / 命令面板 / 弹窗 / 变更集 / 聚合检索 | doc.md, summary.md |
 | `Story-1031-p0-batch1/` | 已实施（构建 + 47 测试全绿） | 批次 A 第一批：交互底座（菜单/右键/键盘）+ 看与改核心（并排 diff/Blame/文件历史/丢弃撤销/推送确认/合并收尾/外部合并工具/tag 推送等 17 项 P0） | doc.md, summary.md |
+| `Story-1031-mcp-git-skill/` | 已实施（构建 + 75 测试全绿） | MCP 支持 + git-spece skill：引擎 bisect/cherry-pick/revert、GSMCP stdio server（59 工具）、App 子命令/设置页/skill 安装器、skill 随包分发到 ~/.agents/skills | doc.md, tasks.md, summary.md |
 
 ## 约定
 

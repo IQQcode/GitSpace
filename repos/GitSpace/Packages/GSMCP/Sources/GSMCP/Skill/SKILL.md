@@ -17,7 +17,7 @@ version: 1.0.0
 {
   "mcpServers": {
     "gitspace": {
-      "command": "/Applications/GitSpace.app/Contents/MacOS/GitSpaceApp",
+      "command": "/Applications/GitSpace.app/Contents/MacOS/GitSpace",
       "args": ["mcp-serve"]
     }
   }

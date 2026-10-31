@@ -169,6 +169,7 @@ flowchart LR
 6. §12 快捷键：恢复关闭标签使用 ⇧⌘T，现有「Tag 管理」改为 ⇧⌘G；命令面板保持 ⌘K 并以 ⌘P 为别名。
 7. §13 里程碑与人力：按批次 A 41 人周重估 M1 至 M3，单列非功能基建。
 8. §17.2 新增待定项：`reset --hard` 是否开放；自定义命令的安全口径；后台 fetch 默认值；AI 的数据外发口径；丢弃撤销快照的保留时长。
+9. §10.1 能力基线新增行（Story-1031-mcp，待评审）：MCP server（`GitSpaceApp mcp-serve`，59 工具，stdio 本地）与 git-spece skill 随包分发；§17.2 的 AI 数据外发口径并入「MCP 写操作口径」（默认读写 + 破坏性 confirm + 设置页总开关，见 `specs/Story-1031-mcp-git-skill/doc.md` §3.5 WP-1）。
 
 ## 8. 待评审决策点
 
