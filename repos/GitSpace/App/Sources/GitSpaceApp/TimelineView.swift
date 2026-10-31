@@ -84,6 +84,16 @@ private struct FilterBar: View {
 private struct CommitListView: View {
     @Environment(AppModel.self) private var app
     @Bindable var timeline: TimelineModel
+    @State private var pendingCheckout: PendingCheckout?
+
+    struct PendingCheckout: Identifiable {
+        let id = UUID()
+        let repoID: String
+        let sha: String
+        /// nil = 检出提交（detached）
+        let branchName: String?
+        let worktreeDirty: Bool
+    }
 
     var body: some View {
         List(selection: Binding(
@@ -95,9 +105,28 @@ private struct CommitListView: View {
             }
         )) {
             ForEach(timeline.filtered) { commit in
-                CommitRow(commit: commit)
-                    .tag(commit.id)
+                CommitRow(
+                    commit: commit,
+                    onNewBranch: { presetBranch(commit) },
+                    onTagHere: { presetTag(commit) },
+                    onCheckoutCommit: { requestCheckout(commit: commit, branchName: nil) },
+                    onCheckoutBranch: { name in requestCheckout(commit: commit, branchName: name) }
+                )
+                .tag(commit.id)
             }
+        }
+        .confirmationDialog(
+            checkoutTitle,
+            isPresented: Binding(get: { pendingCheckout != nil }, set: { if !$0 { pendingCheckout = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let pending = pendingCheckout, pending.branchName != nil, pending.worktreeDirty {
+                Button("stash 后检出") { performCheckout(stashFirst: true) }
+            }
+            Button(checkoutActionLabel, role: .destructive) { performCheckout(stashFirst: false) }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(checkoutMessage)
         }
         .listStyle(.plain)
         .overlay {
@@ -128,10 +157,80 @@ private struct CommitListView: View {
             }
         }
     }
+
+    // MARK: 提交右键与检出（EP02-F03 / EP12-F02）
+
+    private func presetBranch(_ commit: TimelineCommit) {
+        app.branchSheetPresetStartPoint = commit.commit.sha
+        app.activeSheet = .branch
+    }
+
+    private func presetTag(_ commit: TimelineCommit) {
+        app.tagSheetPresetSHA = commit.commit.sha
+        app.activeSheet = .tag
+    }
+
+    private func requestCheckout(commit: TimelineCommit, branchName: String?) {
+        guard let repo = app.repos.first(where: { $0.config.path == commit.repoPath }) else { return }
+        pendingCheckout = PendingCheckout(
+            repoID: repo.id,
+            sha: commit.commit.sha,
+            branchName: branchName,
+            worktreeDirty: (repo.status?.isClean == false)
+        )
+    }
+
+    private var checkoutTitle: String {
+        guard let pending = pendingCheckout else { return "" }
+        if let branch = pending.branchName {
+            return "检出分支 \"\(branch)\"？"
+        }
+        return "检出提交 \(pending.sha.prefix(7))？"
+    }
+
+    private var checkoutActionLabel: String {
+        pendingCheckout?.branchName == nil ? "检出（进入 detached HEAD）" : "检出"
+    }
+
+    private var checkoutMessage: String {
+        guard let pending = pendingCheckout else { return "" }
+        if let branch = pending.branchName {
+            return pending.worktreeDirty
+                ? "工作区有未提交改动，可先 stash 再检出，或取消。"
+                : "将切换到该分支。"
+        }
+        return "检出提交将进入 detached HEAD（不关联分支），后续提交不会被任何分支引用。"
+    }
+
+    private func performCheckout(stashFirst: Bool) {
+        guard let pending = pendingCheckout,
+              let repo = app.repos.first(where: { $0.id == pending.repoID }),
+              let engine = repo.engine else { return }
+        pendingCheckout = nil
+        Task {
+            do {
+                if stashFirst { try await engine.stashPush(message: "GitSpace: 检出前自动暂存") }
+                if let branch = pending.branchName {
+                    try await engine.switchBranch(name: branch)
+                    app.toasts.show("已切换到 \(branch)")
+                } else {
+                    try await engine.checkoutDetached(sha: pending.sha)
+                    app.toasts.show("已检出 \(pending.sha.prefix(7))（detached HEAD）")
+                }
+                await app.refresh(repo)
+            } catch {
+                app.toasts.show(GitPresenter.text(for: error), isError: true)
+            }
+        }
+    }
 }
 
 struct CommitRow: View {
     let commit: TimelineCommit
+    var onNewBranch: () -> Void = {}
+    var onTagHere: () -> Void = {}
+    var onCheckoutCommit: () -> Void = {}
+    var onCheckoutBranch: (String) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .center, spacing: GSSpacing.s) {
@@ -174,16 +273,53 @@ struct CommitRow: View {
                         .font(.caption.weight(.medium))
                         .lineLimit(1)
                 }
-                if let ref = commit.commit.primaryRef {
-                    Text(ref)
-                        .font(.gsMonoSmall)
-                        .foregroundStyle(Color.gs(.accent))
-                        .lineLimit(1)
+                // Ref 徽标（EP02-F02）：本地分支/远程分支/tag/HEAD 分色；双击分支检出
+                HStack(spacing: 4) {
+                    ForEach(commit.commit.decorations, id: \.self) { decoration in
+                        RefBadge(decoration: decoration) {
+                            let kind = RefDecoration.classify(decoration)
+                            switch kind {
+                            case .headBranch(let name), .localBranch(let name):
+                                onCheckoutBranch(name)
+                            default:
+                                break
+                            }
+                        }
+                    }
                 }
+                .lineLimit(1)
             }
-            .frame(width: 170, alignment: .leading)
+            .frame(width: 200, alignment: .leading)
         }
         .frame(height: GSGraph.rowHeight)
+        .contextMenu {
+            Button("复制 SHA") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(commit.commit.sha, forType: .string)
+            }
+            Button("复制提交信息") {
+                NSPasteboard.general.clearContents()
+                let message = commit.commit.body.isEmpty
+                    ? commit.commit.subject
+                    : commit.commit.subject + "\n\n" + commit.commit.body
+                NSPasteboard.general.setString(message, forType: .string)
+            }
+            Divider()
+            Button("从此新建分支…") { onNewBranch() }
+            Button("在此打 tag…") { onTagHere() }
+            Button("检出此提交…") { onCheckoutCommit() }
+            if commit.commit.decorations.contains(where: { RefDecoration.classify($0).isBranch }) {
+                Button("检出分支…") {
+                    if let decoration = commit.commit.decorations.first(where: { RefDecoration.classify($0).isBranch }) {
+                        switch RefDecoration.classify(decoration) {
+                        case .headBranch(let name), .localBranch(let name):
+                            onCheckoutBranch(name)
+                        default: break
+                        }
+                    }
+                }
+            }
+        }
     }
 
     static func relative(_ timestamp: Int) -> String {
@@ -193,6 +329,85 @@ struct CommitRow: View {
             for: Date(timeIntervalSince1970: TimeInterval(timestamp)),
             relativeTo: Date()
         )
+    }
+}
+
+// MARK: - Ref 徽标（EP02-F02）
+
+/// %D 装饰分类（数据来自 git，按前缀分类不猜测）。
+enum RefDecoration: Equatable {
+    case headBranch(String)   // HEAD -> main
+    case localBranch(String)  // 本地分支（无斜杠且非 tag/HEAD）
+    case remoteBranch(String) // 含 /（origin/xxx）
+    case tag(String)          // tag: v1.0
+    case head                 // HEAD（detached）
+
+    static func classify(_ raw: String) -> RefDecoration {
+        if raw == "HEAD" { return .head }
+        if raw.hasPrefix("HEAD -> ") { return .headBranch(String(raw.dropFirst("HEAD -> ".count))) }
+        if raw.hasPrefix("tag: ") { return .tag(String(raw.dropFirst("tag: ".count))) }
+        if raw.contains("/") { return .remoteBranch(raw) }
+        return .localBranch(raw)
+    }
+
+    var isBranch: Bool {
+        switch self {
+        case .headBranch, .localBranch, .remoteBranch: return true
+        case .tag, .head: return false
+        }
+    }
+}
+
+/// 彩色胶囊徽标：双击分支徽标检出（EP02-F02）。
+struct RefBadge: View {
+    let decoration: String
+    var onDoubleClick: (() -> Void)? = nil
+
+    private var kind: RefDecoration { RefDecoration.classify(decoration) }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: iconName).font(.system(size: 7, weight: .bold))
+            Text(displayName)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1.5)
+        .background(color.opacity(0.13), in: Capsule())
+        .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.8))
+        .help(kind.isBranch ? "双击检出 \(displayName)" : displayName)
+        .onTapGesture(count: 2) {
+            if kind.isBranch { onDoubleClick?() }
+        }
+    }
+
+    private var iconName: String {
+        switch kind {
+        case .headBranch, .localBranch: return "arrow.triangle.branch"
+        case .remoteBranch: return "cloud"
+        case .tag: return "tag"
+        case .head: return "location"
+        }
+    }
+
+    private var displayName: String {
+        switch kind {
+        case .headBranch(let name), .localBranch(let name), .remoteBranch(let name), .tag(let name):
+            return name
+        case .head: return "HEAD"
+        }
+    }
+
+    private var color: Color {
+        switch kind {
+        case .headBranch: return Color.gs(.accent)
+        case .localBranch: return Color.gs(.green)
+        case .remoteBranch: return Color.gs(.textMuted)
+        case .tag: return Color.gs(.purple)
+        case .head: return Color.gs(.amber)
+        }
     }
 }
 
@@ -244,6 +459,9 @@ private struct DetailPanel: View {
     @Environment(AppModel.self) private var app
     @Bindable var timeline: TimelineModel
     @State private var selectedFileID: String?
+    // EP02-F04：「包含于」按需加载
+    @State private var containsRefs: ContainsRefs?
+    @State private var isLoadingContains = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -254,7 +472,7 @@ private struct DetailPanel: View {
                 if let file = timeline.selectedFiles.first(where: { $0.id == selectedFileID })
                     ?? timeline.selectedFiles.first {
                     Divider()
-                    DiffTextView(file: file)
+                    DiffFileView(file: file)
                 }
             } else {
                 EmptyStateView(title: "未选择提交", hint: "在时间线中点选一条提交查看详情与 diff")
@@ -304,14 +522,124 @@ private struct DetailPanel: View {
                     }
                 }
             }
+            // EP02-F04：author 与 committer 不同才显示 committer 行
+            if commit.commit.hasDistinctCommitter {
+                HStack(spacing: 6) {
+                    Text("committer")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    AuthorBadge(name: commit.commit.committerName)
+                    Text(CommitRow.relative(commit.commit.committerTimestamp))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
             if !commit.commit.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(commit.commit.body)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(6)
+                let (main, trailers) = Self.splitTrailers(commit.commit.body)
+                if !main.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(main)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(10)
+                }
+                if !trailers.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(trailers.enumerated()), id: \.offset) { _, trailer in
+                            Text(trailer)
+                                .font(.gsMonoSmall)
+                                .foregroundStyle(.tertiary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(GSSpacing.s)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            // 父提交（可点击在时间线定位）
+            if !commit.commit.parents.isEmpty {
+                HStack(spacing: 5) {
+                    Text("父提交")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    ForEach(commit.commit.parents, id: \.self) { parent in
+                        Button {
+                            jumpToCommit(parent)
+                        } label: {
+                            Text(String(parent.prefix(7)))
+                                .font(.gsMonoSmall)
+                                .foregroundStyle(Color.gs(.accent))
+                                .underline()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            // 「包含于」（EP02-F04：按需加载 branch -a --contains / tag --contains）
+            HStack(spacing: GSSpacing.s) {
+                if let refs = containsRefs {
+                    if refs.isEmpty {
+                        Text("不被任何分支或 tag 包含")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        HStack(spacing: 4) {
+                            ForEach(refs.localBranches, id: \.self) { RefBadge(decoration: $0) }
+                            ForEach(refs.remoteBranches, id: \.self) { RefBadge(decoration: $0) }
+                            ForEach(refs.tags, id: \.self) { RefBadge(decoration: "tag: \($0)") }
+                        }
+                        .lineLimit(2)
+                    }
+                } else {
+                    Button {
+                        loadContains(commit: commit)
+                    } label: {
+                        if isLoadingContains {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Text("包含于…").font(.caption)
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(isLoadingContains)
+                }
+                Spacer()
             }
         }
         .padding(GSSpacing.m)
+        .onChange(of: commit.commit.sha) {
+            containsRefs = nil
+        }
+    }
+
+    /// git trailers（Signed-off-by / Change-Id 等）：从正文尾部连续的 `Key: ` 行提取。
+    static func splitTrailers(_ body: String) -> (main: String, trailers: [String]) {
+        var lines = body.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var trailers: [String] = []
+        while let last = lines.last,
+              last.range(of: #"^[A-Za-z][A-Za-z0-9-]*: "#, options: .regularExpression) != nil {
+            trailers.insert(last, at: 0)
+            lines.removeLast()
+        }
+        return (lines.joined(separator: "\n"), trailers)
+    }
+
+    private func jumpToCommit(_ sha: String) {
+        guard let match = timeline.commits.first(where: { $0.commit.sha.hasPrefix(sha) }) else {
+            app.toasts.show("父提交不在已加载时间窗内", isError: true)
+            return
+        }
+        Task { await timeline.select(match, app: app) }
+    }
+
+    private func loadContains(commit: TimelineCommit) {
+        guard let repo = app.repos.first(where: { $0.config.path == commit.repoPath }),
+              let engine = repo.engine else { return }
+        isLoadingContains = true
+        Task {
+            defer { isLoadingContains = false }
+            containsRefs = (try? await engine.refsContaining(sha: commit.commit.sha)) ?? ContainsRefs()
+        }
     }
 
     private func fileList(commit: TimelineCommit) -> some View {

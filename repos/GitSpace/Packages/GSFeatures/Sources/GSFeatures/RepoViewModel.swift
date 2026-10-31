@@ -444,9 +444,9 @@ public final class RepoViewModel {
         return try await engine.stashDiff(index: index)
     }
 
-    public func createTag(name: String, message: String?) async throws {
+    public func createTag(name: String, message: String?, at sha: String? = nil) async throws {
         guard let engine = repo?.engine else { return }
-        try await engine.createTag(name: name, message: message)
+        try await engine.createTag(name: name, message: message, at: sha)
         await refresh()
     }
 

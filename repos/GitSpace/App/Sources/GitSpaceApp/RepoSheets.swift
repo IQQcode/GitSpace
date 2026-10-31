@@ -35,6 +35,9 @@ struct BranchSheet: View {
                     .frame(width: 240)
                 Picker("基于", selection: $newBranchFrom) {
                     Text("当前 HEAD").tag("")
+                    if isPresetStartPoint {
+                        Text(newBranchFrom).tag(newBranchFrom)
+                    }
                     ForEach(vm.branches, id: \.name) { branch in
                         Text(branch.name).tag(branch.name)
                     }
@@ -86,6 +89,12 @@ struct BranchSheet: View {
         }
         .padding(GSSpacing.l)
         .frame(width: 560, height: 500)
+        .onAppear {
+            if let preset = app.branchSheetPresetStartPoint {
+                newBranchFrom = preset
+                app.branchSheetPresetStartPoint = nil
+            }
+        }
         // 脏工作区切换: stash 后切换 / 取消
         .confirmationDialog(
             "工作区有未提交改动, 无法直接切换到 \"\(switchPendingStash ?? "")\"",
@@ -109,6 +118,13 @@ struct BranchSheet: View {
         } message: {
             Text("未合并分支强制删除后, 其提交只能通过 reflog 找回。")
         }
+    }
+
+    /// 提交右键「从此新建分支…」预填（EP02-F03）。
+    private var isPresetStartPoint: Bool {
+        !newBranchFrom.isEmpty
+            && !newBranchFrom.hasPrefix("HEAD")
+            && !vm.branches.contains(where: { $0.name == newBranchFrom })
     }
 
     // MARK: 动作
@@ -796,7 +812,7 @@ struct StashSheet: View {
                     }
                     Divider().padding(.vertical, 4)
                     if let file = stashFiles.first(where: { $0.id == selectedStashFileID }) ?? stashFiles.first {
-                        DiffTextView(file: file)
+                        DiffFileView(file: file)
                     }
                 }
             }
@@ -866,6 +882,8 @@ struct TagSheet: View {
     @State private var newTagName = ""
     @State private var newTagMessage = ""
     @State private var pushAfterCreate = false
+    /// 提交右键「在此打 tag…」预填（EP02-F03）。
+    @State private var presetSHA: String?
     @State private var tagPendingDelete: TagInfo?
     @State private var tagPendingRemoteDelete: TagInfo?
 
@@ -880,14 +898,28 @@ struct TagSheet: View {
                 Button("创建") { createTag() }
                     .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            Toggle("创建后同时推送到 origin（EP07-F05）", isOn: $pushAfterCreate)
-                .font(.caption)
+            HStack(spacing: GSSpacing.s) {
+                Toggle("创建后同时推送到 origin（EP07-F05）", isOn: $pushAfterCreate)
+                    .font(.caption)
+                if let sha = presetSHA {
+                    Label("指向提交 \(sha.prefix(7))", systemImage: "arrow.turn.up.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.gs(.accent))
+                        .help(sha)
+                }
+            }
             Divider()
             tagList
             HStack { Spacer(); Button("完成") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(Color.gs(.accent)) }
         }
         .padding(GSSpacing.l)
         .frame(width: 560, height: 460)
+        .onAppear {
+            if let sha = app.tagSheetPresetSHA {
+                presetSHA = sha
+                app.tagSheetPresetSHA = nil
+            }
+        }
         .confirmationDialog("删除 tag \"\(tagPendingDelete?.name ?? "")\"?", isPresented: Binding(get: { tagPendingDelete != nil }, set: { if !$0 { tagPendingDelete = nil } }), titleVisibility: .visible) {
             Button("删除", role: .destructive) { deleteTag() }
             Button("取消", role: .cancel) {}
@@ -925,9 +957,10 @@ struct TagSheet: View {
     }
 
     private func createTag() {
+        let target = presetSHA
         Task {
             do {
-                try await vm.createTag(name: newTagName, message: newTagMessage.isEmpty ? nil : newTagMessage)
+                try await vm.createTag(name: newTagName, message: newTagMessage.isEmpty ? nil : newTagMessage, at: target)
                 let name = newTagName
                 newTagName = ""; newTagMessage = ""
                 if pushAfterCreate {

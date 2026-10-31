@@ -59,6 +59,10 @@ public final class AppModel {
     public private(set) var pushPreview: [PushPreviewItem] = []
     /// 各仓未成功提交的草稿（EP04-F02：钩子失败等场景保留到下次打开，会话级）。
     public var commitDrafts: [String: String] = [:]
+    /// 提交右键「从此新建分支…」的预填起点（EP02-F03）。
+    public var branchSheetPresetStartPoint: String?
+    /// 提交右键「在此打 tag…」的预填提交（EP02-F03）。
+    public var tagSheetPresetSHA: String?
     /// 丢弃撤销中心（EP04-F01）。
     public let discardUndo = DiscardUndoCenter()
 

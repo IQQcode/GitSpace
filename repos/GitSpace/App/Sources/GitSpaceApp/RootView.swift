@@ -59,7 +59,7 @@ struct RootView: View {
                 TimelineView(timeline: timelineModel)
             case .commit:
                 if app.selectedRepo != nil {
-                    WorkingView(vm: repoVM)
+                    WorkingView(vm: repoVM, onOpenCommit: openCommitInTimeline)
                 } else {
                     EmptyStateView(title: "未选择仓库", hint: "在左侧选择一个仓库后开始提交")
                 }
@@ -198,6 +198,16 @@ struct RootView: View {
             app.toasts.show("请先在左侧选择一个仓库", isError: true); return
         }
         app.activeSheet = sheet
+    }
+
+    /// Blame / 文件历史点击行 → 时间线定位（EP03-F03；仅限已加载时间窗内提交）。
+    private func openCommitInTimeline(sha: String) {
+        guard let match = timelineModel.commits.first(where: { $0.commit.sha.hasPrefix(sha) }) else {
+            app.toasts.show("该提交不在已加载时间窗内，可调整过滤或时间窗口", isError: true)
+            return
+        }
+        tab = .timeline
+        Task { await timelineModel.select(match, app: app) }
     }
 
     private func cycleTheme() {

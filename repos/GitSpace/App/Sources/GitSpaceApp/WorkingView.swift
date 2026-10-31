@@ -7,9 +7,12 @@ import GSDesignKit
 struct WorkingView: View {
     @Environment(AppModel.self) private var app
     @Bindable var vm: RepoViewModel
+    let onOpenCommit: (String) -> Void
     @State private var hunkSelection = Set<Int>()
     @State private var pendingDiscard: PendingDiscard?
     @State private var isCommitting = false
+    @State private var blameRequest: FileToolRequest?
+    @State private var historyRequest: FileToolRequest?
 
     enum PendingDiscard {
         case file(path: String, kind: RepoViewModel.DiscardKind)
@@ -40,6 +43,20 @@ struct WorkingView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text(discardDialogMessage)
+        }
+        .sheet(item: $blameRequest) { request in
+            BlameSheet(vm: vm, request: request, onOpenCommit: onOpenCommit)
+        }
+        .sheet(item: $historyRequest) { request in
+            FileHistorySheet(
+                vm: vm,
+                request: request,
+                onOpenCommit: onOpenCommit,
+                onOpenBlame: { sha, path in
+                    historyRequest = nil
+                    blameRequest = FileToolRequest(path: path, rev: sha)
+                }
+            )
         }
     }
 
@@ -160,6 +177,15 @@ struct WorkingView: View {
                     ) {
                         vm.select(path: entry.path, side: .unstaged)
                     }
+                    .contextMenu {
+                        Button("Blame") { blameRequest = FileToolRequest(path: entry.path) }
+                        Button("文件历史") { historyRequest = FileToolRequest(path: entry.path) }
+                        Divider()
+                        Button("复制路径") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(entry.path, forType: .string)
+                        }
+                    }
                 }
 
                 sectionHeader("未跟踪 · \(vm.untrackedEntries.count)") {}
@@ -199,6 +225,15 @@ struct WorkingView: View {
                     ) {
                         vm.select(path: entry.path, side: .staged)
                     }
+                    .contextMenu {
+                        Button("Blame") { blameRequest = FileToolRequest(path: entry.path) }
+                        Button("文件历史") { historyRequest = FileToolRequest(path: entry.path) }
+                        Divider()
+                        Button("复制路径") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(entry.path, forType: .string)
+                        }
+                    }
                 }
 
                 if vm.unstagedEntries.isEmpty && vm.untrackedEntries.isEmpty && vm.stagedEntries.isEmpty {
@@ -235,7 +270,7 @@ struct WorkingView: View {
                 if file.isBinary {
                     EmptyStateView(title: "二进制文件", hint: "图片 diff 在 P1 支持（MRD 10.1）")
                 } else {
-                    DiffTextView(file: file)
+                    DiffFileView(file: file)
                 }
             } else {
                 EmptyStateView(title: "未选择文件", hint: "在左侧选择文件查看 diff")

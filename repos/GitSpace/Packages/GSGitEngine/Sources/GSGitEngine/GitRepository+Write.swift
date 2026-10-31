@@ -268,13 +268,15 @@ extension GitRepository {
         try await runWrite(["stash", "drop", "stash@{\(index)}"], action: "stash.drop")
     }
 
-    public func createTag(name: String, message: String?) async throws {
-        let arguments: [String]
+    /// 创建 tag（EP02-F03 支持指定提交；EP07-F05 创建后可推送）。
+    public func createTag(name: String, message: String?, at sha: String? = nil) async throws {
+        var arguments: [String]
         if let message, !message.isEmpty {
             arguments = ["tag", "-a", name, "-m", message]
         } else {
             arguments = ["tag", name]
         }
+        if let sha, !sha.isEmpty { arguments.append(sha) }
         try await runWrite(arguments, action: "tag.create")
     }
 
