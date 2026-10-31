@@ -63,10 +63,15 @@ extension GitRepository {
         try await pick(arguments: ["revert", "--no-edit"] + (noCommit ? ["-n"] : []) + [sha], action: "revert")
     }
 
-    /// 中止进行中的 cherry-pick / revert（按存在的中断标记文件选择子命令）。
+    /// 中止进行中的 cherry-pick / revert（经 rev-parse --git-dir 定位真实 gitdir，
+    /// 兼容 worktree / submodule 场景）。
     public func abortPick() async throws {
+        let gitDirOutput = try await runner.run(directory: root, arguments: ["rev-parse", "--git-dir"], options: .quick)
+        let gitDirName = gitDirOutput.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        let gitDir = gitDirName.hasPrefix("/")
+            ? URL(fileURLWithPath: gitDirName)
+            : root.appendingPathComponent(gitDirName)
         let fs = FileManager.default
-        let gitDir = root.appendingPathComponent(".git")
         if fs.fileExists(atPath: gitDir.appendingPathComponent("CHERRY_PICK_HEAD").path) {
             try await runWrite(["cherry-pick", "--abort"], action: "cherry-pick.abort")
         } else if fs.fileExists(atPath: gitDir.appendingPathComponent("REVERT_HEAD").path) {
@@ -77,6 +82,7 @@ extension GitRepository {
     }
 
     /// cherry-pick / revert 共用执行与结果判定（判定口径与 merge 一致：冲突返回 .conflicts）。
+    /// 无 unmerged 路径的 conflict 报错（如「pick is now empty」）原样抛出，不伪装成冲突清单。
     private func pick(arguments: [String], action: String) async throws -> MergeOutcome {
         do {
             _ = try await runWrite(arguments, action: action)
@@ -84,6 +90,7 @@ extension GitRepository {
         } catch let error as GitError {
             if case .conflict = error {
                 let status = try await status()
+                guard !status.unmerged.isEmpty else { throw error }
                 return .conflicts(status.unmerged)
             }
             throw error

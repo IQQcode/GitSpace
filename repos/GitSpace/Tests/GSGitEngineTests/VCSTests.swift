@@ -132,6 +132,7 @@ struct VCSTests {
         try FixtureRepo.write(repo, "b.txt", "two\n")
         try FixtureRepo.commitAll(repo, "second")
         let secondSHA = try GitShell.run(repo, "rev-parse", "HEAD").trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstSHA = try GitShell.run(repo, "rev-parse", "HEAD~1").trimmingCharacters(in: .whitespacesAndNewlines)
 
         let logDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("gitspace-opslog-\(UUID().uuidString)", isDirectory: true)
@@ -141,10 +142,18 @@ struct VCSTests {
             return
         }
 
+        // 顺序敏感：bisect 需要干净区，pick -n 会留下暂存改动，故 bisect 在前
+        _ = try await engine.bisectStart(bad: nil, good: firstSHA)
+        _ = try await engine.bisectMark(.bad)
+        try await engine.bisectReset()
+
         _ = try await engine.revert(sha: secondSHA)
-        try await engine.bisectReset() // 未在二分中也会留痕（失败记录）
+        // revert 已撤销 b.txt，摘回 secondSHA 是非空摘取；-n 成功后改动留在暂存区（无需 abort）
+        _ = try await engine.cherryPick(sha: secondSHA, noCommit: true)
 
         let entries = await logger.recentEntries()
-        #expect(entries.contains { $0.action == "revert" && $0.result == "success" })
+        for action in ["revert", "cherry-pick", "bisect.start", "bisect.mark", "bisect.reset"] {
+            #expect(entries.contains { $0.action == action && $0.result == "success" }, "缺少 \(action) 的成功留痕")
+        }
     }
 }

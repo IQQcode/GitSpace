@@ -69,7 +69,7 @@ enum MCPToolSchema {
 
 /// GitSpace MCP 工具清单（Story-1031-mcp doc §3.3）。
 /// ⚠ 标记 = requiresConfirm（破坏性操作，对齐 MRD 10.2-G 二次确认口径）。
-enum ToolRegistry {
+public enum ToolRegistry {
     static let definitions: [MCPToolDef] = [
         // MARK: 清单与状态
         MCPToolDef(name: "list_repos", description: "列出 GitSpace 已纳管的仓库（名称与绝对路径）。非纳管仓库也可直接把绝对路径传给其他工具的 repo 参数。", [:], required: []),
@@ -170,7 +170,12 @@ enum ToolRegistry {
     static let pathParam = MCPToolSchema.str("仓库内相对路径")
     static let revParam = MCPToolSchema.str("任意 git 版本表达式（SHA / 分支名 / HEAD~1 等），可选")
 
-    static func tool(named name: String) -> MCPToolDef? {
+    public static func tool(named name: String) -> MCPToolDef? {
         definitions.first { $0.name == name }
+    }
+
+    /// 全量工具名（测试防漂移比对用）。
+    public static var names: [String] {
+        definitions.map(\.name)
     }
 }

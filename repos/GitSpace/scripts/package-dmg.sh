@@ -36,6 +36,13 @@ for arch in "${ARCHS[@]}"; do
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+  # SPM 资源 bundle（skill 资源随包分发，Story-1031-mcp）：缺失会导致 GUI 启动时 Bundle 访问失败
+  RESOURCE_BUNDLE="$BIN_DIR/GitSpace_GSMCP.bundle"
+  if [ -d "$RESOURCE_BUNDLE" ]; then
+    cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+  else
+    echo "警告：未找到 $RESOURCE_BUNDLE，skill 内置资源将缺失"
+  fi
   cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

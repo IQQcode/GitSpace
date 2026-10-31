@@ -59,6 +59,29 @@ struct MCPProtocolTests {
         #expect(names.contains("git_bisect_start"))
         #expect(names.contains("git_revert"))
         #expect(names.contains("list_repos"))
+        // 防漂移：与 Registry 全量一致（防未来新增工具漏进 tools/list）
+        #expect(names == Set(ToolRegistry.names))
+    }
+
+    /// 硬闸结构断言（doc §5-3）：MCP 面不存在任意命令透传，也没有触发 force 的入口。
+    @Test func noArbitraryCommandOrForcePassthrough() async throws {
+        for name in ToolRegistry.names {
+            guard let tool = ToolRegistry.tool(named: name) else {
+                Issue.record("工具缺失：\(name)")
+                continue
+            }
+            guard case .object(let properties) = tool.inputSchema["properties"] else {
+                Issue.record("\(name) schema 无 properties")
+                continue
+            }
+            // 不存在接受任意 git 命令/参数数组的工具（引擎硬闸的前提：命令面封闭）
+            for forbidden in ["command", "arguments", "args", "force_push"] {
+                #expect(properties[forbidden] == nil, "\(name) 不得暴露 \(forbidden) 参数")
+            }
+        }
+        // push 类工具不提供 force 入参（引擎对 force push 参数级拦截，MCP 面也不给入口）
+        let pushSchema = ToolRegistry.tool(named: "git_push")?.inputSchema
+        #expect(pushSchema?["properties"]?["force"] == nil)
     }
 
     @Test func unknownMethodReturns32601() async throws {
@@ -193,6 +216,18 @@ struct MCPToolTests {
         // 读工具不受影响
         let read = try await call(server, "git_status", ["repo": .string(repoURL.path)])
         #expect(!isError(read))
+    }
+
+    /// config.json 损坏时 fail-closed（写被拒），缺失时默认允许。
+    @Test func corruptConfigFailsClosed() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gitspace-mcp-corrupt-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let configFile = dir.appendingPathComponent("config.json")
+        try Data("{{{ not json".utf8).write(to: configFile)
+
+        #expect(MCPServer.writesEnabled(configFile: configFile) == false)
+        #expect(MCPServer.writesEnabled(configFile: dir.appendingPathComponent("missing.json")) == true)
     }
 
     @Test func unknownToolAndInvalidRepoReturnReadableErrors() async throws {

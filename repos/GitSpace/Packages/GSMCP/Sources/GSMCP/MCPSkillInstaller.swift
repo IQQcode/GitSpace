@@ -18,12 +18,10 @@ public enum MCPSkillInstaller {
 
     public enum InstallError: Error, CustomStringConvertible {
         case sourceMissing(String)
-        case targetNotWritable(String)
 
         public var description: String {
             switch self {
             case .sourceMissing(let path): return "skill 源不存在：\(path)"
-            case .targetNotWritable(let path): return "skill 目标目录不可写：\(path)"
             }
         }
     }
@@ -84,11 +82,20 @@ public enum MCPSkillInstaller {
         return try? decoder.decode(Manifest.self, from: data)
     }
 
-    /// 解析 SKILL.md frontmatter 里的 `version: x.y.z`（宽松匹配首个 version 键）。
+    /// 解析 SKILL.md frontmatter 里的 `version: x.y.z`（限定 `---` 围栏内，避免误读正文）。
     public static func skillVersion(at skillMarkdown: URL) -> String? {
         guard let text = try? String(contentsOf: skillMarkdown, encoding: .utf8) else { return nil }
+        var inFrontmatter = false
+        var fenceCount = 0
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed == "---" {
+                fenceCount += 1
+                inFrontmatter = fenceCount == 1
+                if fenceCount >= 2 { break }
+                continue
+            }
+            guard inFrontmatter else { continue }
             if trimmed.hasPrefix("version:") {
                 return trimmed.dropFirst("version:".count)
                     .trimmingCharacters(in: .whitespaces)
@@ -103,11 +110,35 @@ public enum MCPSkillInstaller {
             .appendingPathComponent(".agents/skills/git-spece", isDirectory: true)
     }
 
-    /// Bundle 内 skill 源目录（SPM .copy 资源位于 bundle 根的 Skill/ 下）。
+    /// Bundle 内 skill 源目录。
+    /// SPM 资源会产出独立 bundle（GitSpace_GSMCP.bundle）：swift run/测试时 Bundle.module 可直接定位；
+    /// 打包 .app 时该 bundle 位于 Contents/Resources 下——手动查找而非用 Bundle.module，
+    /// 避免资源 bundle 缺失时资源访问器 fatalError（P0-1 的保险丝）。
     public static func bundleSkillDirectory(bundle: Bundle? = nil) -> URL? {
-        let resolved = bundle ?? .module
-        let candidate = resolved.resourceURL?.appendingPathComponent("Skill", isDirectory: true)
-        guard let candidate, FileManager.default.fileExists(atPath: candidate.path) else { return nil }
-        return candidate
+        let fs = FileManager.default
+        var searchRoots: [URL] = []
+        if let bundle {
+            if let resourceURL = bundle.resourceURL { searchRoots.append(resourceURL) }
+        } else {
+            // Bundle.module 仅在资源 bundle 存在时可访问，不能直接触碰；从可推路径找。
+            if let main = Bundle.main.resourceURL { searchRoots.append(main) }
+            if let executableURL = Bundle.main.executableURL {
+                searchRoots.append(executableURL.deletingLastPathComponent())        // swift run: .build/<config>/
+                searchRoots.append(executableURL.deletingLastPathComponent().appendingPathComponent("GitSpace_GSMCP.bundle"))
+            }
+        }
+        for root in searchRoots {
+            let direct = root.appendingPathComponent("Skill", isDirectory: true)
+            if fs.fileExists(atPath: direct.path) { return direct }
+            let nested = root.appendingPathComponent("Contents/Resources/Skill", isDirectory: true)
+            if fs.fileExists(atPath: nested.path) { return nested }
+            let nestedBundle = root.appendingPathComponent("GitSpace_GSMCP.bundle", isDirectory: true)
+            if fs.fileExists(atPath: nestedBundle.path),
+               let inner = Bundle(url: nestedBundle)?.resourceURL {
+                let skill = inner.appendingPathComponent("Skill", isDirectory: true)
+                if fs.fileExists(atPath: skill.path) { return skill }
+            }
+        }
+        return nil
     }
 }

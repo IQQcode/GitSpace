@@ -28,12 +28,22 @@ struct MainEntry {
     }
 
     private static func installSkillIfNeeded() {
-        guard let source = MCPSkillInstaller.bundleSkillDirectory() else { return }
-        _ = try? MCPSkillInstaller.installIfNeeded(
-            sourceDirectory: source,
-            targetDirectory: MCPSkillInstaller.defaultTargetDirectory,
-            manifestFile: GSPaths.skillInstallManifest
-        )
+        guard let source = MCPSkillInstaller.bundleSkillDirectory() else {
+            FileHandle.standardError.write(Data("[GitSpace] skill 资源未随包找到，跳过自动安装（可在设置页查看状态）\n".utf8))
+            return
+        }
+        do {
+            let installed = try MCPSkillInstaller.installIfNeeded(
+                sourceDirectory: source,
+                targetDirectory: MCPSkillInstaller.defaultTargetDirectory,
+                manifestFile: GSPaths.skillInstallManifest
+            )
+            if installed {
+                FileHandle.standardError.write(Data("[GitSpace] git-spece skill 已安装/更新到 ~/.agents/skills/git-spece\n".utf8))
+            }
+        } catch {
+            FileHandle.standardError.write(Data("[GitSpace] skill 安装失败：\(error)\n".utf8))
+        }
     }
 }
 

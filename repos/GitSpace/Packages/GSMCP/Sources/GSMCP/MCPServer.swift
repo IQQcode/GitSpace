@@ -106,7 +106,7 @@ public actor MCPServer {
         let arguments = params?["arguments"] ?? .object([:])
 
         if tool.isWrite {
-            let writesEnabled = (try? MCPAppConfig.read(from: configFile))?.mcpWritesEnabled ?? true
+            let writesEnabled = Self.writesEnabled(configFile: configFile)
             if !writesEnabled {
                 return toolResult("「允许 MCP 写操作」已在 GitSpace 设置中关闭；请到 GitSpace 设置开启后重试，或改用只读工具查询。", isError: true)
             }
@@ -158,15 +158,23 @@ public actor MCPServer {
         guard let path = arguments["repo"]?.stringValue, !path.isEmpty else {
             throw MCPServerError.missingParameter("repo（仓库绝对路径）")
         }
-        if let cached = repoCache[path] { return cached }
+        // 归一化键：/var 与 /private/var、尾斜杠等差异会拆出多实例，破坏「同仓串行」语义。
+        let normalizedPath = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        if let cached = repoCache[normalizedPath] { return cached }
         guard let repo = GitRepository(path: URL(fileURLWithPath: path)) else {
             throw MCPServerError.invalidRepo(path)
         }
-        repoCache[path] = repo
+        repoCache[normalizedPath] = repo
         return repo
     }
 
     // MARK: - 配置与输出
+
+    /// 写开关读取：文件缺失 = 默认允许；文件损坏 = 拒绝写（fail-closed，不让坏配置放大权限）。
+    public static func writesEnabled(configFile: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: configFile.path) else { return true }
+        return (try? MCPAppConfig.read(from: configFile))?.mcpWritesEnabled ?? false
+    }
 
     private func writeResponse(_ value: JSONValue) {
         let encoder = JSONEncoder()
@@ -224,6 +232,7 @@ enum MCPTextLimiter {
 }
 
 /// stdin 行读取：独立线程阻塞读，避免占用 Swift 协作线程池。
+/// 单次使用约束：每个实例只应被迭代一次（二次迭代会再开线程重复读 stdin）。
 struct StdinLineStream: AsyncSequence {
     typealias Element = String
 
